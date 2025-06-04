@@ -4,7 +4,6 @@
 install.packages(c("tidyverse","stargazer","knitr","broom","haven","fixest","modelsummary","gt","webshot2"))
 library(tidyverse)
 library(stargazer)
-library(kableExtra)
 library(knitr)
 library(broom)
 library(haven)
@@ -26,6 +25,7 @@ incum_dep_vars1 <- c("INC05_running", "INC05_voteshare", "INC05_won",
                      "INCorFAM05_running", "INCorFAM05_voteshare", "INCorFAM05_won")
 
 # Loading the data
+# Change the path if necessary.
 data <- read_dta("~/work/Electoral data cleaned.dta")
 
 # Filtering the data (keeping non-reserved GPs, and only 1 observation)
@@ -86,7 +86,7 @@ control_means <- list()
 test_results <- list()
 
 
-### Models with "any treatment"
+### Models with "any treatment" 
 for (i in 1:length(incum_dep_vars1)) {
   dep_var <- incum_dep_vars1[i]
   
@@ -108,7 +108,7 @@ for (i in 1:length(incum_dep_vars1)) {
   test_results[[i]] <- calculate_tests(model, "any_treatment")
 }
 
-### Models with "gender and general treatment"
+### Models with "gender and general treatment" 
 for (i in 1:length(incum_dep_vars1)) {
   dep_var <- incum_dep_vars1[i]
   j <- i + length(incum_dep_vars1)
@@ -126,7 +126,11 @@ for (i in 1:length(incum_dep_vars1)) {
 }
 
 
-### TABLE
+### TABLE v1
+# This one is exhaustive compared to the one in the article.
+# For each group (incumbent, incumbent spouse, or other family member), it displays running, voteshare, and victory outcome.
+
+
 create_formatted_table <- function(models_list, control_means, test_results) {
   
   # modelsummary to extract coefficients
@@ -181,7 +185,7 @@ create_formatted_table <- function(models_list, control_means, test_results) {
       )
     ) %>%
     tab_footnote(
-      footnote = "Écarts-types entre parenthèses. *** p<0.01, ** p<0.05, * p<0.1",
+      footnote = "Usual significance thresholds. *** p<0.01, ** p<0.05, * p<0.1",
       locations = cells_title("subtitle")
     )
   
@@ -192,16 +196,121 @@ create_formatted_table <- function(models_list, control_means, test_results) {
 regression_table <- create_formatted_table(models_list, control_means, test_results)
 
 # Saving the table
+# Change path if necessary.
 regression_table %>%
   gtsave(filename = file.path("~/work/T1_Incumbent_2010_formatted.html"))
+
+
+### TABLE v2
+
+# This table is less exhaustive.
+# It has the same columns as on page 21 of the article.
+
+# only six columns
+incum_dep_vars_reduced <- c("INC05_running", "INC05_voteshare", 
+                            "INCSPOUSE05_running", "INCSPOUSE05_voteshare",
+                            "INCOTHER05_running", "INCOTHER05_voteshare")
+
+# estimation
+models_list_reduced <- list()
+control_means_reduced <- list()
+test_results_reduced <- list()
+
+### PANEL A: average effects
+for (i in 1:length(incum_dep_vars_reduced)) {
+  dep_var <- incum_dep_vars_reduced[i]
+  
+  # control mean
+  control_mean <- data_filtered %>%
+    filter(INT_treatment == 0 & RES05_gender == 0) %>%
+    summarise(mean = mean(!!sym(dep_var), na.rm = TRUE)) %>%
+    pull(mean) %>%
+    round(2)
+  
+  control_means_reduced[[i]] <- control_mean
+  
+  # model estimate
+  formula <- create_formula(dep_var, "any_treatment")
+  model <- lm(formula, data = data_filtered)
+  models_list_reduced[[i]] <- model
+  
+  # statistical tests
+  test_results_reduced[[i]] <- calculate_tests(model, "any_treatment")
+}
+
+### PANEL B: effects by type of campaign
+for (i in 1:length(incum_dep_vars_reduced)) {
+  dep_var <- incum_dep_vars_reduced[i]
+  j <- i + length(incum_dep_vars_reduced)
+  
+  # control mean
+  control_means_reduced[[j]] <- control_means_reduced[[i]]
+  
+  # model estimate
+  formula <- create_formula(dep_var, "gender_general")
+  model <- lm(formula, data = data_filtered)
+  models_list_reduced[[j]] <- model
+  
+  # statistical tests
+  test_results_reduced[[j]] <- calculate_tests(model, "gender_general")
+}
+
+# creating the table
+regression_table_reduced <- modelsummary(models_list_reduced,
+                                         output = "gt",
+                                         statistic = "std.error",
+                                         stars = c('*' = 0.1, '**' = 0.05, '***' = 0.01),
+                                         coef_omit = paste(gpcontrols, collapse = "|"),
+                                         gof_omit = ".*") %>%
+  tab_header(
+    title = "Table 1 - Incumbent and family entry",
+    subtitle = "Columns 1-6 = Average treatment ; Columns 7-12 = Gender vs General treatments"
+  ) %>%
+  tab_spanner(
+    label = "Incumbent (Runs, Voteshare)",
+    columns = 2:3
+  ) %>%
+  tab_spanner(
+    label = "Spouse (Runs, Voteshare)", 
+    columns = 4:5
+  ) %>%
+  tab_spanner(
+    label = "Other Family (Runs, Voteshare)",
+    columns = 6:7
+  ) %>%
+  tab_spanner(
+    label = "Panel B: Gender vs General Treatment",
+    columns = 8:13
+  ) %>%
+  tab_style(
+    style = list(
+      cell_text(weight = "bold"),
+      cell_fill(color = "#667eea")
+    ),
+    locations = cells_column_labels()
+  ) %>%
+  tab_footnote(
+    footnote = "Usual significance levels. *** p<0.01, ** p<0.05, * p<0.1",
+    locations = cells_title("subtitle")
+  )
+
+# display
+regression_table_reduced
+
+# saving
+# change path if necessary.
+regression_table_reduced %>%
+  gtsave(filename = file.path("~/work/T1_Incumbent_reduced.html"))
+
+
 
 
 
 
 # Model summary display
-cat("\nRésumé des modèles estimés:\n")
-cat("Nombre total de modèles:", length(models_list), "\n")
-cat("Variables dépendantes:", paste(incum_dep_vars1, collapse = ", "), "\n")
-cat("Nombre d'observations par modèle:", sapply(models_list, nobs), "\n")
+cat("\nSummary of estimated models:\n")
+cat("Total amount of models:", length(models_list), "\n")
+cat("Dependent variables:", paste(incum_dep_vars1, collapse = ", "), "\n")
+cat("Amount of observations per model:", sapply(models_list, nobs), "\n")
 
 
