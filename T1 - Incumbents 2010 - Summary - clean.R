@@ -1,4 +1,6 @@
-# Chargement des packages nécessaires
+### REPLICATION - TABLE 1 - INCUMBENT AND INCUMBENT'S FAMILY ENTRY ###########
+
+# PACKAGES
 install.packages(c("tidyverse","stargazer","knitr","broom","haven","fixest","modelsummary","gt","webshot2"))
 library(tidyverse)
 library(stargazer)
