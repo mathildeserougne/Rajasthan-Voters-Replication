@@ -305,6 +305,46 @@ regression_table_reduced %>%
 
 
 
+########### Table reduced but with stargazer: 
+
+
+# Variables à afficher
+outregvar2 <- c("INT_treatment", "INT_treatment_gender", "INT_treatment_general")
+
+# Créer des labels de colonnes
+col_names <- c(
+  paste("Any Treat", 1:11),
+  paste("Gender/General", 1:11)
+)
+
+# Créer le tableau avec stargazer
+stargazer(models_list,
+          type = "text",  # Mettre "latex" ou "html" selon tes besoins
+          column.labels = col_names,
+          keep = outregvar2,
+          add.lines = list(
+            c("District FE", rep("Yes", length(models_list))),
+            c("GP Controls", rep("Yes", length(models_list)))
+          ),
+          digits = 2,
+          title = "Table 1: Effects on Incumbent and Family Candidate Entry (2005)",
+          out = "Table1_Incumbent_2010.txt")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 # Model summary display
