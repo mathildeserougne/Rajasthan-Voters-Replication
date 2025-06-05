@@ -308,18 +308,18 @@ regression_table_reduced %>%
 ########### Table reduced but with stargazer: 
 
 
-# Variables à afficher
+# Variables to display
 outregvar2 <- c("INT_treatment", "INT_treatment_gender", "INT_treatment_general")
 
-# Créer des labels de colonnes
+# col names
 col_names <- c(
   paste("Any Treat", 1:11),
   paste("Gender/General", 1:11)
 )
 
-# Créer le tableau avec stargazer
+# generate table
 stargazer(models_list,
-          type = "text",  # Mettre "latex" ou "html" selon tes besoins
+          type = "text",  
           column.labels = col_names,
           keep = outregvar2,
           add.lines = list(
@@ -333,7 +333,34 @@ stargazer(models_list,
 
 
 
+########### Table reduced but EXTENDED with the summary stats on control means 
 
+# variables to display
+outregvar2 <- c("INT_treatment", "INT_treatment_gender", "INT_treatment_general")
+
+# colnames
+col_names <- c(
+  paste("Any Treat", 1:12),
+  paste("Gender/General", 1:12)
+)
+
+# additional lines for means and test results!
+additional_lines <- list(
+  c("District FE", rep("Yes", length(models_list))),
+  c("GP Controls", rep("Yes", length(models_list))),
+  c("Mean in Control not WR in 2005", unlist(control_means)),
+  c("Test Treat Effect in WR=0", sapply(test_results, function(x) x$pval1))
+)
+
+# generate table
+stargazer(models_list,
+          type = "text",  
+          column.labels = col_names,
+          keep = outregvar2,
+          add.lines = additional_lines,
+          digits = 2,
+          title = "Table 1: Effects on Incumbent and Family Candidate Entry (2005)",
+          out = "Table1_Incumbent_2010.txt")
 
 
 

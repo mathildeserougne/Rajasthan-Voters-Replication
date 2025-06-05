@@ -405,15 +405,16 @@ stargazer(all_models,
 
 
 
-###### Clean output in html (like in Table 1)
 
-## IN PROGRESS
+# ALTERNATIVE OUTPUT, MORE SUMMARY STATS (like in the article)
+## VERSION KEPT !!
 
-create_outreg_table_v2 <- function(results_list_full, results_list_inc, results_list_no_inc) {
+
+create_outreg_table <- function(results_list_full, results_list_inc, results_list_no_inc) {
   
-  cat("\n=== CRÉATION DU TABLEAU FINAL V2 ===\n")
+  cat("\n=== Generating the output table ===\n")
   
-  # Fonction pour extraire les coefficients d'un modèle
+  # Extracting coefficients from the model
   extract_model_results <- function(model_result) {
     if (is.null(model_result) || is.null(model_result$model)) {
       return(NULL)
@@ -423,21 +424,21 @@ create_outreg_table_v2 <- function(results_list_full, results_list_inc, results_
     summary_model <- summary(model)
     coef_table <- summary_model$coefficients
     
-    # Extraire les coefficients des variables d'intérêt
+    # Extract coefficients of interest variables
     results <- list()
     
     for (var in outregvar2) {
-      # Chercher la variable (peut avoir un nom légèrement différent)
+      # Look for the variable
       matching_vars <- rownames(coef_table)[grepl(var, rownames(coef_table))]
       
       if (length(matching_vars) > 0) {
-        var_name <- matching_vars[1]  # Prendre le premier match
+        var_name <- matching_vars[1]  # Take first match
         
         coef_val <- coef_table[var_name, "Estimate"]
         se_val <- coef_table[var_name, "Std. Error"]
         pval <- coef_table[var_name, "Pr(>|t|)"]
         
-        # Étoiles de significativité
+        # Stars
         stars <- ""
         if (pval < 0.01) stars <- "***"
         else if (pval < 0.05) stars <- "**"
@@ -448,8 +449,8 @@ create_outreg_table_v2 <- function(results_list_full, results_list_inc, results_
           se = round(se_val, 3),
           pval = pval,
           stars = stars,
-          coef_formatted = paste0(format(round(coef_val, 3), nsmall = 3), stars),
-          se_formatted = paste0("(", format(round(se_val, 3), nsmall = 3), ")")
+          coef_formatted = paste0(round(coef_val, 3), stars),
+          se_formatted = paste0("(", round(se_val, 3), ")")
         )
       } else {
         results[[var]] <- list(
@@ -457,8 +458,8 @@ create_outreg_table_v2 <- function(results_list_full, results_list_inc, results_
           se = NA,
           pval = NA,
           stars = "",
-          coef_formatted = "",
-          se_formatted = ""
+          coef_formatted = "NA",
+          se_formatted = "(NA)"
         )
       }
     }
@@ -466,217 +467,152 @@ create_outreg_table_v2 <- function(results_list_full, results_list_inc, results_
     return(results)
   }
   
-  # Créer une structure pour organiser les résultats par variable dépendante
-  organized_results <- list()
-  
-  # Pour chaque variable dépendante
-  for (i in seq_along(dep_vars)) {
-    dep_var <- dep_vars[i]
-    
-    cat(paste("\nTraitement de", dep_var, "...\n"))
-    
-    # Extraire les résultats pour chaque sous-échantillon
-    full_results <- if (i <= length(results_list_full)) {
-      extract_model_results(results_list_full[[i]])
-    } else {
-      NULL
-    }
-    
-    inc_results <- if (i <= length(results_list_inc)) {
-      extract_model_results(results_list_inc[[i]])
-    } else {
-      NULL  
-    }
-    
-    no_inc_results <- if (i <= length(results_list_no_inc)) {
-      extract_model_results(results_list_no_inc[[i]])
-    } else {
-      NULL
-    }
-    
-    organized_results[[dep_var]] <- list(
-      full = full_results,
-      inc = inc_results,
-      no_inc = no_inc_results
-    )
-  }
-  
-  # Créer le tableau final avec une meilleure structure
+  # Final table
   final_table <- data.frame(
     Variable = character(),
+    Full_Sample = character(),
+    Inc_Can_Run = character(),
+    Inc_Cannot_Run = character(),
     stringsAsFactors = FALSE
   )
   
-  # Ajouter les colonnes pour chaque variable dépendante
-  for (dep_var in dep_vars) {
-    final_table[[paste0(dep_var, "_Full")]] <- character()
-    final_table[[paste0(dep_var, "_Inc")]] <- character()
-    final_table[[paste0(dep_var, "_NoInc")]] <- character()
-  }
-  
-  # Remplir le tableau pour chaque variable explicative
-  for (var in outregvar2) {
+  # For each dependent variable
+  for (i in seq_along(dep_vars)) {
+    dep_var <- dep_vars[i]
     
-    # Ligne des coefficients
-    coef_row <- data.frame(Variable = var, stringsAsFactors = FALSE)
+    cat(paste("\nTreatment of", dep_var, "...\n"))
     
-    # Ligne des erreurs standard  
-    se_row <- data.frame(Variable = "", stringsAsFactors = FALSE)
-    
-    for (dep_var in dep_vars) {
-      # Coefficients
-      coef_row[[paste0(dep_var, "_Full")]] <- if (!is.null(organized_results[[dep_var]]$full[[var]])) {
-        organized_results[[dep_var]]$full[[var]]$coef_formatted
-      } else {
-        ""
-      }
-      
-      coef_row[[paste0(dep_var, "_Inc")]] <- if (!is.null(organized_results[[dep_var]]$inc[[var]])) {
-        organized_results[[dep_var]]$inc[[var]]$coef_formatted
-      } else {
-        ""
-      }
-      
-      coef_row[[paste0(dep_var, "_NoInc")]] <- if (!is.null(organized_results[[dep_var]]$no_inc[[var]])) {
-        organized_results[[dep_var]]$no_inc[[var]]$coef_formatted
-      } else {
-        ""
-      }
-      
-      # Erreurs standard
-      se_row[[paste0(dep_var, "_Full")]] <- if (!is.null(organized_results[[dep_var]]$full[[var]])) {
-        organized_results[[dep_var]]$full[[var]]$se_formatted
-      } else {
-        ""
-      }
-      
-      se_row[[paste0(dep_var, "_Inc")]] <- if (!is.null(organized_results[[dep_var]]$inc[[var]])) {
-        organized_results[[dep_var]]$inc[[var]]$se_formatted
-      } else {
-        ""
-      }
-      
-      se_row[[paste0(dep_var, "_NoInc")]] <- if (!is.null(organized_results[[dep_var]]$no_inc[[var]])) {
-        organized_results[[dep_var]]$no_inc[[var]]$se_formatted
-      } else {
-        ""
-      }
+    # Extract results for each subsample
+    if (i <= length(results_list_full)) {
+      full_results <- extract_model_results(results_list_full[[i]])
+    } else {
+      full_results <- NULL
     }
     
-    final_table <- rbind(final_table, coef_row, se_row)
+    if (i <= length(results_list_inc)) {
+      inc_results <- extract_model_results(results_list_inc[[i]])
+    } else {
+      inc_results <- NULL
+    }
+    
+    if (i <= length(results_list_no_inc)) {
+      no_inc_results <- extract_model_results(results_list_no_inc[[i]])
+    } else {
+      no_inc_results <- NULL
+    }
+    
+    # Rows for each explanatory variable
+    for (var in outregvar2) {
+      
+      # Coefficients row
+      coef_row <- data.frame(
+        Variable = var,
+        Full_Sample = if (!is.null(full_results[[var]])) full_results[[var]]$coef_formatted else "NA",
+        Inc_Can_Run = if (!is.null(inc_results[[var]])) inc_results[[var]]$coef_formatted else "NA",
+        Inc_Cannot_Run = if (!is.null(no_inc_results[[var]])) no_inc_results[[var]]$coef_formatted else "NA",
+        stringsAsFactors = FALSE
+      )
+      
+      # Std errors
+      se_row <- data.frame(
+        Variable = paste0("  ", var, "_se"),
+        Full_Sample = if (!is.null(full_results[[var]])) full_results[[var]]$se_formatted else "(NA)",
+        Inc_Can_Run = if (!is.null(inc_results[[var]])) inc_results[[var]]$se_formatted else "(NA)",
+        Inc_Cannot_Run = if (!is.null(no_inc_results[[var]])) no_inc_results[[var]]$se_formatted else "(NA)",
+        stringsAsFactors = FALSE
+      )
+      
+      final_table <- rbind(final_table, coef_row, se_row)
+    }
+    
+    # Visual separators
+    if (i < length(dep_vars)) {
+      sep_row <- data.frame(
+        Variable = paste("--- End of", dep_var, "---"),
+        Full_Sample = "",
+        Inc_Can_Run = "",
+        Inc_Cannot_Run = "",
+        stringsAsFactors = FALSE
+      )
+      final_table <- rbind(final_table, sep_row)
+    }
   }
+  
+  # Add new rows for "Mean in Control not WR in 2005" and "Test Treat Effect in WR=0"
+  mean_control_row <- data.frame(
+    Variable = "Mean in Control not WR in 2005",
+    Full_Sample = summary_stats$Full_Control_Mean[1],
+    Inc_Can_Run = summary_stats$Inc_Control_Mean[1],
+    Inc_Cannot_Run = summary_stats$NoInc_Control_Mean[1],
+    stringsAsFactors = FALSE
+  )
+  
+  test_effect_row <- data.frame(
+    Variable = "Test Treat Effect in WR=0",
+    Full_Sample = summary_stats$Full_Joint_Test[1],
+    Inc_Can_Run = summary_stats$Inc_Joint_Test[1],
+    Inc_Cannot_Run = summary_stats$NoInc_Joint_Test[1],
+    stringsAsFactors = FALSE
+  )
+  
+  final_table <- rbind(final_table, mean_control_row, test_effect_row)
   
   return(final_table)
 }
 
-# Fonction alternative utilisant modelsummary si disponible
-create_modelsummary_table <- function(results_list_full, results_list_inc, results_list_no_inc) {
-  
-  # Vérifier si modelsummary est disponible
-  if (!require(modelsummary, quietly = TRUE)) {
-    stop("Le package 'modelsummary' n'est pas installé. Installez-le avec install.packages('modelsummary')")
-  }
-  
-  # Combiner tous les modèles
-  all_models <- c()
-  model_names <- c()
-  
-  for (i in seq_along(dep_vars)) {
-    if (i <= length(results_list_full) && !is.null(results_list_full[[i]]$model)) {
-      all_models <- c(all_models, list(results_list_full[[i]]$model))
-      model_names <- c(model_names, paste0(dep_vars[i], "_Full"))
-    }
-    
-    if (i <= length(results_list_inc) && !is.null(results_list_inc[[i]]$model)) {
-      all_models <- c(all_models, list(results_list_inc[[i]]$model))
-      model_names <- c(model_names, paste0(dep_vars[i], "_Inc"))
-    }
-    
-    if (i <= length(results_list_no_inc) && !is.null(results_list_no_inc[[i]]$model)) {
-      all_models <- c(all_models, list(results_list_no_inc[[i]]$model))
-      model_names <- c(model_names, paste0(dep_vars[i], "_NoInc"))
-    }
-  }
-  
-  names(all_models) <- model_names
-  
-  # Créer le tableau avec modelsummary
-  table <- modelsummary(
-    all_models,
-    output = "data.frame",
-    statistic = "std.error",
-    stars = c('*' = 0.1, '**' = 0.05, '***' = 0.01),
-    coef_map = setNames(outregvar2, outregvar2),  # Garder seulement les variables d'intérêt
-    gof_omit = ".*"  # Supprimer toutes les statistiques de qualité d'ajustement
-  )
-  
-  return(table)
-}
+# Create the main table
+main_table <- create_outreg_table(results_full, results_inc_can, results_inc_cannot)
 
-# Fonction pour créer une table au format gt si le package est disponible
-create_gt_table <- function(results_list_full, results_list_inc, results_list_no_inc) {
-  
-  # Vérifier si gt est disponible
-  if (!require(gt, quietly = TRUE)) {
-    message("Le package 'gt' n'est pas disponible. Retour au format data.frame.")
-    return(create_outreg_table_v2(results_list_full, results_list_inc, results_list_no_inc))
-  }
-  
-  # Utiliser modelsummary si disponible
-  if (require(modelsummary, quietly = TRUE)) {
-    
-    # Combiner tous les modèles
-    all_models <- list()
-    
-    for (i in seq_along(dep_vars)) {
-      if (i <= length(results_list_full) && !is.null(results_list_full[[i]]$model)) {
-        all_models[[paste0("Full_", dep_vars[i])]] <- results_list_full[[i]]$model
-      }
-      
-      if (i <= length(results_list_inc) && !is.null(results_list_inc[[i]]$model)) {
-        all_models[[paste0("Inc_", dep_vars[i])]] <- results_list_inc[[i]]$model
-      }
-      
-      if (i <= length(results_list_no_inc) && !is.null(results_list_no_inc[[i]]$model)) {
-        all_models[[paste0("NoInc_", dep_vars[i])]] <- results_list_no_inc[[i]]$model
-      }
-    }
-    
-    # Créer le tableau avec modelsummary et gt
-    gt_table <- modelsummary(
-      all_models,
-      output = "gt",
-      statistic = "std.error",
-      stars = c('*' = 0.1, '**' = 0.05, '***' = 0.01),
-      coef_map = setNames(outregvar2, outregvar2),
-      gof_omit = ".*"
-    ) %>%
-      tab_header(
-        title = "Tableau de régression",
-        subtitle = "Comparaison entre échantillons complets et restreints"
-      ) %>%
-      tab_footnote(
-        footnote = "Erreurs standard entre parenthèses. *** p<0.01, ** p<0.05, * p<0.1",
-        locations = cells_title("subtitle")
-      )
-    
-    return(gt_table)
-    
-  } else {
-    # Utiliser la version basique et la convertir en gt
-    basic_table <- create_outreg_table_v2(results_list_full, results_list_inc, results_list_no_inc)
-    
-    gt_table <- basic_table %>%
-      gt() %>%
-      tab_header(
-        title = "Tableau de régression",
-        subtitle = "Résultats des régressions par sous-échantillon"
-      )
-    
-    return(gt_table)
-  }
-}
+# Create summary table
+summary_stats <- create_summary_stats(results_full, results_inc_can, results_inc_cannot)
+
+# Displaying and saving the results
+cat("\n=== Regression results ===\n")
+print(main_table)
+
+# Formatted clean table with stargazer
+# Combine all models
+all_models <- c(
+  lapply(results_full, function(x) x$model),
+  lapply(results_inc_can, function(x) x$model),
+  lapply(results_inc_cannot, function(x) x$model)
+)
+
+# Columns names
+col_names <- c(
+  paste("Full Sample", 1:6),
+  paste("Inc Can Run", 1:6),
+  paste("Inc Cannot Run", 1:6)
+)
+
+# Generate table
+stargazer(all_models,
+          type = "text",
+          column.labels = col_names,
+          keep = outregvar2,
+          add.lines = list(
+            c("District FE", rep("Yes", length(all_models))),
+            c("GP Controls", rep("Yes", length(all_models))),
+            c("Mean in Control not WR in 2005", summary_stats$Full_Control_Mean[1], summary_stats$Inc_Control_Mean[1], summary_stats$NoInc_Control_Mean[1], rep("", length(all_models) - 3)),
+            c("Test Treat Effect in WR=0", summary_stats$Full_Joint_Test[1], summary_stats$Inc_Joint_Test[1], summary_stats$NoInc_Joint_Test[1], rep("", length(all_models) - 3))
+          ),
+          digits = 2,
+          title = "Table 3: Challenger entry",
+          out = "Table3_Challengers_2010.txt")
 
 
 
+
+
+
+
+
+
+
+
+
+
+###### Clean output in html (like in Table 1)
+
+## IN PROGRESS
 
