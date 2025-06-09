@@ -15,9 +15,10 @@ library(haven)
 electoral_data <- read_dta("~/work/Electoral data cleaned.dta")
 household_data <- read_dta("~/work/Household survey data cleaned.dta")
 
-# Vérifier les données chargées
-head(electoral_data)
-head(household_data)
+
+
+
+
 
 
 
