@@ -1,0 +1,15 @@
+
+Statistics descriptives
+================================
+          Variable         Mean 
+--------------------------------
+1    mean_D_NREGA_work     0.485
+2  mean_D_NREGA_work_gen   0.378
+3 mean_D_NREGA_work_nongen 0.506
+4  mean_D_NREGA_work_ind   0.328
+5   mean_D_NREGA_work_m    0.347
+6   mean_D_NREGA_work_f    0.308
+7       mean_LFP_ind       0.539
+8        mean_LFP_m        0.889
+9        mean_LFP_f        0.296
+--------------------------------

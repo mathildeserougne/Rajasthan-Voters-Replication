@@ -42,3 +42,33 @@ summary_stats <- data_clean %>%
 stargazer(summary_stats, type = "text", title = "Statistics descriptives",
           out = "T0_NREGA_Participation.txt")
 
+
+## other method for the table, as the previous one gives something empty
+
+# Charger les bibliothèques nécessaires
+library(dplyr)
+library(stargazer)
+
+# Calculer les statistiques descriptives
+summary_stats <- data_clean %>%
+  summarise(
+    mean_D_NREGA_work = mean(D_NREGA_work, na.rm = TRUE),
+    mean_D_NREGA_work_gen = mean(D_NREGA_work_gen, na.rm = TRUE),
+    mean_D_NREGA_work_nongen = mean(D_NREGA_work_nongen, na.rm = TRUE),
+    mean_D_NREGA_work_ind = mean(D_NREGA_work_ind, na.rm = TRUE),
+    mean_D_NREGA_work_m = mean(D_NREGA_work_m, na.rm = TRUE),
+    mean_D_NREGA_work_f = mean(D_NREGA_work_f, na.rm = TRUE),
+    mean_LFP_ind = mean(LFP_ind, na.rm = TRUE),
+    mean_LFP_m = mean(LFP_m, na.rm = TRUE),
+    mean_LFP_f = mean(LFP_f, na.rm = TRUE)
+  )
+
+# Transformer les statistiques en un data frame avec une colonne pour les noms des variables
+summary_stats_df <- data.frame(Variable = names(summary_stats), Mean = as.numeric(summary_stats))
+
+# Générer le tableau de statistiques descriptives avec stargazer
+stargazer(summary_stats_df, type = "text", title = "Statistics descriptives",
+          summary = FALSE, out = "T0_NREGA_Participation.txt")
+
+
+
