@@ -3,11 +3,11 @@
 
 # Libraries (install packages if necessary)
 library(dplyr)
-library(fixest)  # Pour les régressions avec effets fixes
-library(stargazer)  # Pour les tableaux de sortie
-library(haven)    # Pour lire les fichiers Stata (.dta)
-library(broom)    # Pour extraire les résultats de régression
-library(aod)      # Pour les tests de Wald
+library(fixest)  # for fixed effects
+library(stargazer)  
+library(haven)    
+library(broom)    
+library(aod)      # for wald tests
 
 
 ## DEFINING THE MACROS 
@@ -316,6 +316,7 @@ create_outreg_table <- function(results_list_full, results_list_inc, results_lis
   return(final_table)
 }
 
+
 # summary stats (not used in the paper, might delete that as well)
 create_summary_stats <- function(results_list_full, results_list_inc, results_list_no_inc) {
   
@@ -366,6 +367,7 @@ summary_stats <- create_summary_stats(results_full, results_inc_can, results_inc
 
 
 
+# jump to the 'see here'
 
 ## DISPLAYING AND SAVING THE RESULTS
 
@@ -405,6 +407,7 @@ stargazer(all_models,
 
 
 
+#### SEE HERE ##########
 
 # ALTERNATIVE OUTPUT, MORE SUMMARY STATS (like in the article)
 ## VERSION KEPT !!
@@ -603,16 +606,4 @@ stargazer(all_models,
 
 
 
-
-
-
-
-
-
-
-
-
-###### Clean output in html (like in Table 1)
-
-## IN PROGRESS
 
