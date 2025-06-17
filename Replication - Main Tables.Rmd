@@ -2,12 +2,26 @@
 title: "Replication - Main Tables"
 output:
   pdf_document: default
-  html_document: default
+  html_document: 
+    css: |
+      body {
+        word-wrap: break-word;
+        overflow-wrap: break-word;
+      }
+      pre {
+        white-space: pre-wrap;
+      }
 date: "2025-06-15"
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(
+  tidy = TRUE,
+  tidy.opts = list(width.cutoff = 60),
+  fig.width = 6,
+  fig.height = 4
+)
+options(width = 60)
 ```
 
 
