@@ -1,95 +1,53 @@
 ## REPLICATION - TABLE 5: KNOWLEDGE AND PERCEPTION OF THE NREGA ################
 ################################################################################
 
-# Installer et charger les packages nécessaires
-install.packages(c("haven", "dplyr", "tidyr", "fixest"))
+# Un-comment the packages installation if necessary
+install.packages(c("haven"))
+
+# Required libraries
 library(haven)
-library(dplyr)
-library(tidyr)
-library(fixest)
-
-# Charger les données
-electoral_data <- read_dta("~/work/Electoral data cleaned.dta")
-household_data <- read_dta("~/work/Household survey data cleaned.dta")
-
-# Fusionner les données
-merged_data <- household_data %>%
-  inner_join(electoral_data, by = c("district", "ps", "gp"))
 
 
-long_data <- merged_data %>%
-  pivot_longer(
-    cols = c(A_age_m, A_age_f, A_literacy_m, A_literacy_f, A_educ_m, A_educ_f, D_NREGA_work_m, D_NREGA_work_f),
-    names_to = c("variable", "gender"),
-    names_pattern = "(.*)_(.)",
-    values_to = "value"
-  ) %>%
-  pivot_wider(
-    names_from = variable,
-    values_from = value,
-    names_repair = "universal"
-  )
+### MA
+
+### DATA 
+
+## 1) Electoral data work
+
+# importing the data
+# creating local macro
+# selection of global macros
 
 
-long_data <- long_data %>%
-  mutate(
-    C_I_AgeBelow25 = ifelse(A_age < 25, 1, 0),
-    C_I_Age2535 = ifelse(A_age >= 25 & A_age < 35, 1, 0),
-    C_I_Age3545 = ifelse(A_age >= 35 & A_age < 45, 1, 0),
-    C_I_AgeAbove45 = ifelse(A_age >= 45 & !is.na(A_age), 1, 0),
-    C_I_Female = ifelse(gender == "f", 1, 0),
-    C_I_Literate = ifelse(A_literacy == 4, 1, 0),
-    C_I_EducNone = ifelse(A_educ == 0, 1, 0),
-    C_I_EducPrimary = ifelse(A_educ > 0 & A_educ <= 5, 1, 0),
-    C_I_EducLowerSec = ifelse(A_educ > 5 & A_educ <= 9, 1, 0),
-    C_I_EducUpperSec = ifelse(A_educ > 9 & A_educ <= 12, 1, 0),
-    C_I_EducTertiary = ifelse(A_educ > 12 & !is.na(A_educ), 1, 0),
-    C_I_Missing = ifelse(is.na(A_age) | is.na(A_educ) | is.na(A_literacy), 1, 0),
-    C_H_bpl = ifelse(H_bpl == 1, 1, 0),
-    C_H_ownland = ifelse(H_ownland == 1, 1, 0),
-    C_H_hindu = ifelse(H_religion == 1, 1, 0),
-    C_H_CasteGen = ifelse(H_caste == 1 | H_caste == 5, 1, 0),
-    C_H_CasteOBC = ifelse(H_caste == 2 | H_caste == 6, 1, 0),
-    C_H_CasteSC = ifelse(H_caste == 3, 1, 0),
-    C_H_CasteST = ifelse(H_caste == 4, 1, 0),
-    C_H_Missing = ifelse(is.na(H_bpl) | is.na(H_ownland) | is.na(H_religion) | is.na(H_caste), 1, 0)
-  )
+## 2) Household survey data work
+
+# merge
+
+
+## Reshape data from household to individual level
+
+# what we keep
+# what we reshape
+# creation of new variables as well
+
+# controls
+
+# normalisation of variables
 
 
 
-long_data <- long_data %>%
-  group_by(`INT_treatment.x`, `RES05_gender.y`) %>%
-  mutate(across(c(E_know_minimumwage_m, E_know_maximumdays_m, E_know_sarpanchrole_projects_m,
-                  E_know_sarpanchrole_jobcard_m, E_know_sarpanchrole_work_m, E_know_jobcardapplication_m,
-                  E_know_waitingdays_m, E_know_unemploymentallowance_m, E_know_postofficepay_m,
-                  E_rate_NREGAimplementation_m, E_rate_NREGAimplementation_g_m, E_rate_NREGAimplementation_vg_m,
-                  E_rate_sarpanchperformance_m, E_rate_sarpanchperformance_g_m, E_rate_sarpanchperformance_vg_m,
-                  E_know_minimumwage_f, E_know_maximumdays_f, E_know_sarpanchrole_projects_f,
-                  E_know_sarpanchrole_jobcard_f, E_know_sarpanchrole_work_f, E_know_jobcardapplication_f,
-                  E_know_waitingdays_f, E_know_unemploymentallowance_f, E_know_postofficepay_f,
-                  E_rate_NREGAimplementation_f, E_rate_NREGAimplementation_g_f, E_rate_NREGAimplementation_vg_f,
-                  E_rate_sarpanchperformance_f, E_rate_sarpanchperformance_g_f, E_rate_sarpanchperformance_vg_f),
-                ~ ifelse(`INT_treatment.x` == 0 & `RES05_gender.y` == 0, scale(.x), .x))) %>%
-  ungroup()
+## regression 1
+## regression 2
+## regression 3
+
+
+## Output file
 
 
 
-long_data <- long_data %>%
-  mutate(
-    E_know_nregarules = rowMeans(select(., starts_with("E_know_")), na.rm = TRUE),
-    E_know_sarpanchrole = rowMeans(select(., E_know_sarpanchrole_projects_m, E_know_sarpanchrole_jobcard_m, E_know_sarpanchrole_work_m,
-                                          E_know_sarpanchrole_projects_f, E_know_sarpanchrole_jobcard_f, E_know_sarpanchrole_work_f), na.rm = TRUE),
-    E_rate_nrega = rowMeans(select(., E_rate_NREGAimplementation_m, E_rate_sarpanchperformance_m,
-                                   E_rate_NREGAimplementation_f, E_rate_sarpanchperformance_f), na.rm = TRUE),
-    F_rate_publicgoods = rowMeans(select(., F_rate_publicgoods_road_m, F_rate_publicgoods_pump_m, F_rate_publicgoods_school_m,
-                                         F_rate_publicgoods_road_f, F_rate_publicgoods_pump_f, F_rate_publicgoods_school_f), na.rm = TRUE)
-  )
 
 
 
-# Exemple de régression avec effets fixes
-regression_results <- feols(E_know_nregarules ~ TEMP_X_res_index | ID_gp_no, data = long_data)
-summary(regression_results)
 
 
 
