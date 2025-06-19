@@ -182,6 +182,10 @@ merged_data_long <- merged_data_long %>%
   )
 
 
+# tentatives de m'en sortir sinon je vais mourir
+
+print(colnames(merged_data_long))
+
 
 
 

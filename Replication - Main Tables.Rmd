@@ -31,12 +31,6 @@ options(width = 60)
 
 ## Table 1 - Incumbent 2010
 
-Packages to install if not done already.
-
-```{r}
-install.packages(c("tidyverse","stargazer","knitr","broom","haven","fixest","modelsummary","gt","webshot2"))
-```
-
 Required libraries.
 
 ```{r}
@@ -49,27 +43,28 @@ library(fixest)
 library(modelsummary)
 library(gt)
 library(webshot2)
+library(car)
 ```
 
-Macros, controls, and sample selection.
 
+Defining the control and dependent variables.
 ```{r}
-# Defining the control variables
-gpcontrols <- c("GP_population", "GP_lit", "GP_sc", "GP_st", "GP_nbvillages", 
-                "RES00_gender", "RES00_obc", "RES00_sc", "RES00_st", 
+gpcontrols <- c("GP_population", "GP_lit", "GP_sc", "GP_st", "GP_nbvillages",
+                "RES00_gender", "RES00_obc", "RES00_sc", "RES00_st",
                 "RES10_obc", "RES10_sc", "RES10_st", "RES05_obc", "RES05_sc", "RES05_st")
 
-# Defining the dependent variables
-incum_dep_vars1 <- c("INC05_running", "INC05_voteshare", "INC05_won", 
-                     "INCSPOUSE05_running", "INCSPOUSE05_voteshare", "INCSPOUSE05_won",
-                     "INCOTHER05_running", "INCOTHER05_voteshare", "INCOTHER05_won",
-                     "INCorFAM05_running", "INCorFAM05_voteshare", "INCorFAM05_won")
 
-# Loading the data
-# Change the path if necessary.
+incum_dep_vars1 <- c("INC05_running", "INC05_voteshare",
+                     "INCSPOUSE05_running", "INCSPOUSE05_voteshare",
+                     "INCOTHER05_running", "INCOTHER05_voteshare")
+```
+
+
+Loading the data and filtering it.
+```{r}
 data <- read_dta("~/work/Electoral data cleaned.dta")
 
-# Filtering the data (keeping non-reserved GPs, and only 1 observation)
+
 data_filtered <- data %>%
   filter(RES10_gender == 0 & SAMPLE_hhsurvey == 1 & GP_tag == 1 & INC05_can_run == 1) %>%
   mutate(
@@ -79,63 +74,85 @@ data_filtered <- data %>%
   )
 ```
 
-Model estimation.
 
+Function for the regression formulas.
 ```{r}
-# Function for the regression formulas
 create_formula <- function(dep_var, model_type) {
   base_controls <- paste(gpcontrols, collapse = " + ")
   
   if (model_type == "any_treatment") {
-    formula_str <- paste(dep_var, "~ INT_treatment + RES05_gender + X_anytr_genderres05 +", 
+    formula_str <- paste(dep_var, "~ INT_treatment + RES05_gender + INT_treatment:RES05_gender +",
                          base_controls, "+ factor(district)")
   } else if (model_type == "gender_general") {
-    formula_str <- paste(dep_var, "~ INT_treatment_gender + INT_treatment_general + RES05_gender +",
-                         "X_generaltr_genderres05 + X_gendertr_genderres05 +", 
+    formula_str <- paste(dep_var, "~ INT_treatment_gender + INT_treatment_general + RES05_gender + INT_treatment_gender:RES05_gender + INT_treatment_general:RES05_gender +",
                          base_controls, "+ factor(district)")
   }
   
   return(as.formula(formula_str))
 }
+```
 
-# Function for the statistical tests
+Function for the statistical tests. 
+```{r}
 calculate_tests <- function(model, model_type) {
   if (model_type == "any_treatment") {
-    # Test: RES05_gender + X_anytr_genderres05 = 0
-    test1 <- car::linearHypothesis(model, "RES05_gender + X_anytr_genderres05 = 0")
-    pval1 <- test1$`Pr(>F)`[2]
+    test1 <- tryCatch({
+      car::linearHypothesis(model, "RES05_gender = 0")
+    }, error = function(e) list(PrF = NA))
+    pval1 <- if (!is.null(test1$PrF)) round(test1$`Pr(>F)`[2], 2) else NA
     
-    # Test: INT_treatment = RES05_gender
-    test2 <- car::linearHypothesis(model, "INT_treatment - RES05_gender = 0")
-    pval2 <- test2$`Pr(>F)`[2]
+    test2 <- tryCatch({
+      car::linearHypothesis(model, "INT_treatment:RES05_gender = 0")
+    }, error = function(e) list(PrF = NA))
+    pval2 <- if (!is.null(test2$PrF)) round(test2$`Pr(>F)`[2], 2) else NA
     
-    return(list(pval1 = round(pval1, 2), pval2 = round(pval2, 2)))
+    test3 <- tryCatch({
+      car::linearHypothesis(model, "INT_treatment = INT_treatment:RES05_gender")
+    }, error = function(e) list(PrF = NA))
+    pval3 <- if (!is.null(test3$PrF)) round(test3$`Pr(>F)`[2], 2) else NA
     
+    return(list(pval1 = pval1, pval2 = pval2, pval3 = pval3))
   } else if (model_type == "gender_general") {
-    # Test: INT_treatment_gender = INT_treatment_general
-    test1 <- car::linearHypothesis(model, "INT_treatment_gender - INT_treatment_general = 0")
-    pval1 <- test1$`Pr(>F)`[2]
+    test1 <- tryCatch({
+      car::linearHypothesis(model, "INT_treatment_gender:RES05_gender = 0")
+    }, error = function(e) list(PrF = NA))
+    pval1 <- if (!is.null(test1$PrF)) round(test1$`Pr(>F)`[2], 2) else NA
     
-    # Test: INT_treatment_gender + X_gendertr_genderres05 = INT_treatment_general + X_generaltr_genderres05
-    test2 <- car::linearHypothesis(model, 
-                                   "INT_treatment_gender + X_gendertr_genderres05 - INT_treatment_general - X_generaltr_genderres05 = 0")
-    pval2 <- test2$`Pr(>F)`[2]
+    test2 <- tryCatch({
+      car::linearHypothesis(model, "INT_treatment_general:RES05_gender = 0")
+    }, error = function(e) list(PrF = NA))
+    pval2 <- if (!is.null(test2$PrF)) round(test2$`Pr(>F)`[2], 2) else NA
     
-    return(list(pval1 = round(pval1, 2), pval2 = round(pval2, 2)))
+    test3 <- tryCatch({
+      car::linearHypothesis(model, "INT_treatment_gender = INT_treatment_general")
+    }, error = function(e) list(PrF = NA))
+    pval3 <- if (!is.null(test3$PrF)) round(test3$`Pr(>F)`[2], 2) else NA
+    
+    test4 <- tryCatch({
+      car::linearHypothesis(model, "INT_treatment_gender:RES05_gender = INT_treatment_general:RES05_gender")
+    }, error = function(e) list(PrF = NA))
+    pval4 <- if (!is.null(test4$PrF)) round(test4$`Pr(>F)`[2], 2) else NA
+    
+    return(list(pval1 = pval1, pval2 = pval2, pval3 = pval3, pval4 = pval4))
   }
 }
 
-# Estimating the models
+```
+
+
+Estimating the models, starting by initialising lists of results.
+```{r}
 models_list <- list()
 control_means <- list()
 test_results <- list()
+```
 
 
-### Models with "any treatment" 
+Models with "any treatment":
+```{r}
 for (i in 1:length(incum_dep_vars1)) {
   dep_var <- incum_dep_vars1[i]
   
-  # control mean
   control_mean <- data_filtered %>%
     filter(INT_treatment == 0 & RES05_gender == 0) %>%
     summarise(mean = mean(!!sym(dep_var), na.rm = TRUE)) %>%
@@ -144,63 +161,67 @@ for (i in 1:length(incum_dep_vars1)) {
   
   control_means[[i]] <- control_mean
   
-  # model estimate
   formula <- create_formula(dep_var, "any_treatment")
   model <- lm(formula, data = data_filtered)
   models_list[[i]] <- model
   
-  # statistical tests
   test_results[[i]] <- calculate_tests(model, "any_treatment")
 }
+```
 
-### Models with "gender and general treatment" 
+
+Models with "gender and general treatment":
+```{r}
 for (i in 1:length(incum_dep_vars1)) {
   dep_var <- incum_dep_vars1[i]
   j <- i + length(incum_dep_vars1)
   
-  # control mean
   control_means[[j]] <- control_means[[i]]
   
-  # model estimate
   formula <- create_formula(dep_var, "gender_general")
   model <- lm(formula, data = data_filtered)
   models_list[[j]] <- model
   
-  # statistical tests
   test_results[[j]] <- calculate_tests(model, "gender_general")
 }
-
 ```
 
-Table.
 
+Variables to display and selection of columns and summary statistics (means and test results).
 ```{r}
-# variables to display
-outregvar2 <- c("INT_treatment", "INT_treatment_gender", "INT_treatment_general")
+outregvar2 <- c("INT_treatment", "INT_treatment_gender", "INT_treatment_general", "RES05_gender", "INT_treatment:RES05_gender", "INT_treatment_gender:RES05_gender", "INT_treatment_general:RES05_gender")
 
-# colnames
-col_names <- c(
-  paste("Any Treat", 1:12),
-  paste("Gender/General", 1:12)
-)
 
-# additional lines for means and test results!
+col_names <- c("Incumbent Runs", "Incumbent Vote Share",
+               "Incumbent Spouse Runs", "Incumbent Spouse Vote Share",
+               "Other Family Member Runs", "Other Family Member Vote Share")
+
+
 additional_lines <- list(
-  c("District FE", rep("Yes", length(models_list))),
-  c("GP Controls", rep("Yes", length(models_list))),
-  c("Mean in Control not WR in 2005", unlist(control_means)),
-  c("Test Treat Effect in WR=0", sapply(test_results, function(x) x$pval1))
+  c("Observations", sapply(models_list, function(x) nobs(x))),
+  c("Mean in Control without GQ", unlist(control_means)),
+  c("Treatment with GQ = Treat without GQ", sapply(test_results[1:length(incum_dep_vars1)], function(x) x$pval3)),
+  c("Gender Treat = General Treat without GQ", sapply(test_results[(length(incum_dep_vars1)+1):length(test_results)], function(x) x$pval3)),
+  c("Gender Treat = General Treat with GQ", sapply(test_results[(length(incum_dep_vars1)+1):length(test_results)], function(x) x$pval4))
 )
+```
 
-# generate table
+
+Generating the output table.
+```{r}
 stargazer(models_list,
-          type = "text",  
+          type = "text",
           column.labels = col_names,
           keep = outregvar2,
           add.lines = additional_lines,
           digits = 2,
-          title = "Table 1: Effects on Incumbent and Family Candidate Entry (2005)",
-          out = "Table1_Incumbent_2010.txt")
+          title = "Table 1: Effects on Incumbent and Family Candidate Entry",
+          out = "Table1_Incumbent_2010_completed.txt")
+```
+
+Narrower version of the table.
+
+```{r}
 
 ```
 
