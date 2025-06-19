@@ -228,8 +228,8 @@ Narrower version of the table.
 
 ## Table 2 - Performance 2010
 
+Required libraries:
 ```{r}
-# Libraries
 library(tidyverse)
 library(fixest)
 library(stargazer)
@@ -237,24 +237,22 @@ library(haven)
 library(lmtest)
 ```
 
-```{r}
-# ## DEFINITION OF THE MACROS ## #
+Defining the macros: control variables and variables related to the regression.
 
+```{r}
 # Control variables
 gpcontrols <- c("GP_population", "GP_lit", "GP_sc", "GP_st", "GP_nbvillages",
                 "RES00_gender", "RES00_obc", "RES00_sc", "RES00_st",
                 "RES10_obc", "RES10_sc", "RES10_st", "RES05_obc", "RES05_sc", "RES05_st")
 
-gpcontrols15 <- c(gpcontrols, "RES15_obc", "RES15_sc", "RES15_st")
-
 # Regression variables
 outregvar2 <- c("INT_treatment", "RES05_gender", "X_anytr_genderres05")
 ```
 
-```{r}
-# ## DATA PROCESSING ## #
+Data processing: uploading, filtering.
 
-# Loading the data. Change path accordingly to your workspace.
+```{r}
+# Change path accordingly to your workspace.
 data <- read_dta("~/work/Electoral data cleaned.dta")
 
 # Filtering the data
@@ -265,34 +263,30 @@ data_filtered <- data %>%
     FAMnotINC05_voteshare = INCFAM05_voteshare - INC05_voteshare,
     FAMnotINC05_won = INCFAM05_won - INC05_won
   )
+```
 
-# Generate the PERFORMANCE INDICES of the program
-
-# Explanation: used variables to build the indices are the data related to the success of implementation of the NREGA program.
-# Standardized measures about: participation, satisfied demand, waiting time, work done in the frame of the program. 
+Generation of the performance indices of the program.
+```{r}
 data_filtered <- data_filtered %>%
   mutate(
-    # index_empl_svy_0 participation, unmet demand (men and women)
     index_empl_svy_0 = rowMeans(select(., std_HH_NREGA, std_HH_NREGA_unmet_demand_m, std_HH_NREGA_unmet_demand_f), na.rm = TRUE),
-    # index_empl_svy_1 unmet demand, waiting time, and work provided within the NREGA (men and women)
     index_empl_svy_1 = rowMeans(select(., std_HH_NREGA_unmet_demand, std_HH_NREGA_unmet_demand_m, std_HH_NREGA_unmet_demand_f, std_HH_NREGA_waiting_time_m, std_HH_NREGA_waiting_time_f, std_HH_NREGA, std_HH_NREGA_work_m, std_HH_NREGA_work_f), na.rm = TRUE),
-    # index_empl_svy_2 work provided (men and women)
     index_empl_svy_2 = rowMeans(select(., std_HH_NREGA, std_HH_NREGA_work_m, std_HH_NREGA_work_f), na.rm = TRUE),
-    # index_empl_svy_3 unmet demand (men and women)
     index_empl_svy_3 = rowMeans(select(., std_HH_NREGA_unmet_demand_m, std_HH_NREGA_unmet_demand_f), na.rm = TRUE)
   )
+```
 
-# Dependent variables
+Dependent variables.
+```{r}
 incum_dep_vars1 <- c("INC05_running", "INC05_voteshare", "INC05_won",
                      "INCSPOUSE05_running", "INCSPOUSE05_voteshare", "INCSPOUSE05_won",
                      "INCOTHER05_running", "INCOTHER05_voteshare", "INCOTHER05_won")
 
-indices <- c("index_empl_svy_1")
-
+indices <- c("index_empl_svy_0", "index_empl_svy_1", "index_empl_svy_2", "index_empl_svy_3")
 ```
 
+Initialization of the lists for the upcoming results.
 ```{r}
-# Starting lists to stock the upcoming results
 models_list <- list()
 control_means <- numeric(length(incum_dep_vars1) * length(indices))
 pvals_1 <- numeric(length(incum_dep_vars1) * length(indices))
@@ -302,9 +296,8 @@ effect_good <- numeric(length(incum_dep_vars1) * length(indices))
 effect_bad <- numeric(length(incum_dep_vars1) * length(indices))
 ```
 
+Doing the regressions.
 ```{r}
-# ## DOING THE REGRESSIONS ## #
-
 i <- 0
 for (x in 0:1) {
   for (dep_var in incum_dep_vars1) {
@@ -330,8 +323,6 @@ for (x in 0:1) {
       index_sd <- round(index_stats$sd, 2)
       
       # interaction variables
-      # explanation: interactions between performance at the time and gender of the incumbent in 2005 and treatment
-      # helps evaluating how the treatment effects vary depending on the gender and the performance of the incumbent
       data_filtered <- data_filtered %>%
         mutate(
           TEMP_index = get(index),
@@ -357,7 +348,7 @@ for (x in 0:1) {
           
           # doing the tests
           test_1 <- tryCatch({
-            waldtest(model, c("INT_treatment + TEMP_X_anytr_index" = 0, paste("TEMP_index", index_mean, sep = " = ")))
+            waldtest(model, c("INT_treatment + TEMP_X_anytr_index = 0", paste("TEMP_index =", index_mean)))
           }, error = function(e) {
             message("Error in test 1: ", e$message)
             NULL
@@ -370,7 +361,7 @@ for (x in 0:1) {
           }
           
           test_2 <- tryCatch({
-            waldtest(model, c("INT_treatment + TEMP_X_anytr_index" = 0))
+            waldtest(model, c("INT_treatment + TEMP_X_anytr_index = 0"))
           }, error = function(e) {
             message("Error in test 2: ", e$message)
             NULL
@@ -401,29 +392,56 @@ for (x in 0:1) {
     }
   }
 }
-
 ```
+
+Generation of a table displaying the coefficients of interest.
 
 ```{r}
-# ## GENERATING THE OUTPUT TABLE ## #
+# Selection of the right models to display
+panel_A_models <- models_list[c(1, 5, 13, 17, 25, 29)]
+panel_B_models <- models_list[c(37, 41, 49, 53, 61, 65)]
 
-stargazer(models_list,
-          type = "text",
-          column.labels = paste("Model", 1:length(models_list)),
-          keep = c("INT_treatment", "TEMP_index", "TEMP_X_anytr_index"),
-          add.lines = list(
-            c("District FE", rep("Yes", length(models_list))),
-            c("GP Controls", rep("Yes", length(models_list))),
-            c("Mean in Control not WR in 2005", control_means),
-            c("Test Treat Effect", pvals_1),
-            c("Test Perf Effect in Treat", pvals_2)
-          ),
-          digits = 2,
-          title = "Table 2: Performance - 2010",
-          # change output path accordingly to your workspace
-          out = file.path("~/work/Rajasthan-Voters-Replication/Table2_Performance_2010.txt"))
+# Panel A
+panel_A <- stargazer(
+  panel_A_models,
+  type = "text",
+  column.labels = c("Model 1", "Model 5", "Model 13", "Model 17", "Model 25", "Model 29"),
+  keep = c("INT_treatment", "TEMP_index", "TEMP_X_anytr_index"),
+  add.lines = list(
+    c("District FE", rep("Yes", length(panel_A_models))),
+    c("GP Controls", rep("Yes", length(panel_A_models))),
+    c("Mean in Control not WR in 2005", control_means[c(1, 5, 13, 17, 25, 29)]),
+    c("Test Treat Effect", pvals_1[c(1, 5, 13, 17, 25, 29)]),
+    c("Test Perf Effect in Treat", pvals_2[c(1, 5, 13, 17, 25, 29)])
+  ),
+  digits = 2,
+  title = "Panel A: GP without Gender Quota in 2005",
+  single.row = TRUE
+)
 
+# Panel B
+panel_B <- stargazer(
+  panel_B_models,
+  type = "text",
+  column.labels = c("Model 37", "Model 41", "Model 49", "Model 53", "Model 61", "Model 65"),
+  keep = c("INT_treatment", "TEMP_index", "TEMP_X_anytr_index"),
+  add.lines = list(
+    c("District FE", rep("Yes", length(panel_B_models))),
+    c("GP Controls", rep("Yes", length(panel_B_models))),
+    c("Mean in Control not WR in 2005", control_means[c(37, 41, 49, 53, 61, 65)]),
+    c("Test Treat Effect", pvals_1[c(37, 41, 49, 53, 61, 65)]),
+    c("Test Perf Effect in Treat", pvals_2[c(37, 41, 49, 53, 61, 65)])
+  ),
+  digits = 2,
+  title = "Panel B: GP with Gender Quota in 2005",
+  single.row = TRUE
+)
+
+# Combine the two in one txt doc
+combined_output <- c(panel_A, "\n\n", panel_B)
+writeLines(combined_output, file.path("~/work/Rajasthan-Voters-Replication/Table2_Performance_2010_completed.txt"))
 ```
+
 
 
 

@@ -1,170 +1,219 @@
 ## TABLE 2 PERFORMANCE COMPLETED ###############
 
+### REPLICATION - TABLE 2 - INCUMBENT PERFORMANCE AND ENTRY ###########
+# Install packages if necessary
+install.packages(c("tidyverse", "fixest", "stargazer", "haven", "lmtest"))
+
 # Libraries
 library(tidyverse)
-library(stargazer)
-library(knitr)
-library(broom)
-library(haven)
 library(fixest)
-library(modelsummary)
-library(gt)
-library(webshot2)
-library(car)
+library(stargazer)
+library(haven)
+library(lmtest)
 
-# Load the data
-data <- read_dta("~/work/Electoral data cleaned.dta")
-
-# Define control variables
+# ## DEFINITION OF THE MACROS ## #
+# Control variables
 gpcontrols <- c("GP_population", "GP_lit", "GP_sc", "GP_st", "GP_nbvillages",
                 "RES00_gender", "RES00_obc", "RES00_sc", "RES00_st",
                 "RES10_obc", "RES10_sc", "RES10_st", "RES05_obc", "RES05_sc", "RES05_st")
 
-# Define dependent variables
-incum_dep_vars1 <- c("INC05_running", "INC05_voteshare", "INC05_won",
-                     "INCSPOUSE05_running", "INCSPOUSE05_voteshare", "INCSPOUSE05_won",
-                     "INCOTHER05_running", "INCOTHER05_voteshare", "INCOTHER05_won")
+# Regression variables
+outregvar2 <- c("INT_treatment", "RES05_gender", "X_anytr_genderres05")
 
-# Filter the data
+# ## DATA PROCESSING ## #
+# Loading the data. Change path accordingly to your workspace.
+data <- read_dta("~/work/Electoral data cleaned.dta")
+
+# Filtering the data
 data_filtered <- data %>%
-  filter(RES10_gender == 0 & SAMPLE_hhsurvey == 1 & GP_tag == 1 & INC05_can_run == 1) %>%
+  filter(RES10_gender == 0, SAMPLE_hhsurvey == 1, GP_tag == 1, INC05_can_run == 1) %>%
   mutate(
-    FAMnotINC05_running = INCorFAM05_running - INC05_running,
-    FAMnotINC05_voteshare = INCorFAM05_voteshare - INC05_voteshare,
-    FAMnotINC05_won = INCorFAM05_won - INC05_won
+    FAMnotINC05_running = INCFAM05_running - INC05_running,
+    FAMnotINC05_voteshare = INCFAM05_voteshare - INC05_voteshare,
+    FAMnotINC05_won = INCFAM05_won - INC05_won
   )
 
-# Create indices
+# Generate the PERFORMANCE INDICES of the program
 data_filtered <- data_filtered %>%
   mutate(
-    index_empl_svy_0 = rowMeans(select(., starts_with("std_HH_NREGA_")), na.rm = TRUE),
-    index_empl_svy_1 = rowMeans(select(., std_HH_NREGA_unmet_demand_m, std_HH_NREGA_unmet_demand_f, std_HH_NREGA_waiting_time_m, std_HH_NREGA_waiting_time_f, std_HH_NREGA, std_HH_NREGA_work_m, std_HH_NREGA_work_f), na.rm = TRUE),
+    index_empl_svy_0 = rowMeans(select(., std_HH_NREGA, std_HH_NREGA_unmet_demand_m, std_HH_NREGA_unmet_demand_f), na.rm = TRUE),
+    index_empl_svy_1 = rowMeans(select(., std_HH_NREGA_unmet_demand, std_HH_NREGA_unmet_demand_m, std_HH_NREGA_unmet_demand_f, std_HH_NREGA_waiting_time_m, std_HH_NREGA_waiting_time_f, std_HH_NREGA, std_HH_NREGA_work_m, std_HH_NREGA_work_f), na.rm = TRUE),
     index_empl_svy_2 = rowMeans(select(., std_HH_NREGA, std_HH_NREGA_work_m, std_HH_NREGA_work_f), na.rm = TRUE),
     index_empl_svy_3 = rowMeans(select(., std_HH_NREGA_unmet_demand_m, std_HH_NREGA_unmet_demand_f), na.rm = TRUE)
   )
 
-# Function for regression formulas
-create_formula <- function(dep_var, index_var) {
-  as.formula(paste(dep_var, "~ INT_treatment +", index_var, "+ INT_treatment:", index_var, "+", paste(gpcontrols, collapse = " + "), "+ factor(district)"))
-}
+# Dependent variables
+incum_dep_vars1 <- c("INC05_running", "INC05_voteshare", "INC05_won",
+                     "INCSPOUSE05_running", "INCSPOUSE05_voteshare", "INCSPOUSE05_won",
+                     "INCOTHER05_running", "INCOTHER05_voteshare", "INCOTHER05_won")
 
-# Function for statistical tests
-# Function for statistical tests
-calculate_tests <- function(model, mean_index, index_var) {
-  # Test 1: INT_treatment + INT_treatment:index_var = 0
-  test1 <- tryCatch({
-    car::linearHypothesis(model, paste0("INT_treatment + INT_treatment:", index_var, " = 0"))
-  }, error = function(e) {
-    return(list(PrF = NA))
-  })
-  pval1 <- if (!is.null(test1$PrF)) round(test1$`Pr(>F)`[2], 2) else NA
-  
-  # Test 2: INT_treatment + INT_treatment:index_var * mean_index = 0
-  test2 <- tryCatch({
-    car::linearHypothesis(model, c("INT_treatment = 0", paste0("INT_treatment:", index_var, " = 0")))
-  }, error = function(e) {
-    return(list(PrF = NA))
-  })
-  pval2 <- if (!is.null(test2$PrF)) round(test2$`Pr(>F)`[2], 2) else NA
-  
-  return(list(pval1 = pval1, pval2 = pval2))
-}
+indices <- c("index_empl_svy_0", "index_empl_svy_1", "index_empl_svy_2", "index_empl_svy_3")
 
-# Estimating the models
-# Estimating the models
+# Starting lists to stock the upcoming results
 models_list <- list()
-control_means <- list()
-test_results <- list()
+control_means <- numeric(length(incum_dep_vars1) * length(indices))
+pvals_1 <- numeric(length(incum_dep_vars1) * length(indices))
+pvals_2 <- numeric(length(incum_dep_vars1) * length(indices))
+effect_average <- numeric(length(incum_dep_vars1) * length(indices))
+effect_good <- numeric(length(incum_dep_vars1) * length(indices))
+effect_bad <- numeric(length(incum_dep_vars1) * length(indices))
 
-for (dep_var in incum_dep_vars1) {
-  for (index_var in c("index_empl_svy_0", "index_empl_svy_1", "index_empl_svy_2", "index_empl_svy_3")) {
-    control_mean <- data_filtered %>%
-      filter(INT_treatment == 0 & RES05_gender == 0) %>%
-      summarise(mean = mean(!!sym(dep_var), na.rm = TRUE)) %>%
-      pull(mean) %>%
-      round(2)
-    
-    control_means[[paste(dep_var, index_var, sep = "_")]] <- control_mean
-    
-    formula <- create_formula(dep_var, index_var)
-    model <- lm(formula, data = data_filtered)
-    models_list[[paste(dep_var, index_var, sep = "_")]] <- model
-    
-    mean_index <- mean(data_filtered[[index_var]], na.rm = TRUE)
-    test_results[[paste(dep_var, index_var, sep = "_")]] <- calculate_tests(model, mean_index, index_var)
+# ## DOING THE REGRESSIONS ## #
+i <- 0
+for (x in 0:1) {
+  for (dep_var in incum_dep_vars1) {
+    for (index in indices) {
+      i <- i + 1
+      
+      # control mean
+      control_mean <- data_filtered %>%
+        filter(INT_treatment == 0 & RES05_gender == x) %>%
+        summarise(mean = mean(!!sym(dep_var), na.rm = TRUE)) %>%
+        pull(mean) %>%
+        round(2)
+      
+      control_means[i] <- control_mean
+      
+      # mean and standard error of the index
+      index_stats <- data_filtered %>%
+        filter(RES05_gender == x) %>%
+        summarise(mean = mean(!!sym(index), na.rm = TRUE),
+                  sd = sd(!!sym(index), na.rm = TRUE))
+      
+      index_mean <- round(index_stats$mean, 2)
+      index_sd <- round(index_stats$sd, 2)
+      
+      # interaction variables
+      data_filtered <- data_filtered %>%
+        mutate(
+          TEMP_index = get(index),
+          TEMP_X_res_index = RES05_gender * get(index),
+          TEMP_X_anytr_index = INT_treatment * get(index),
+          TEMP_X_anytr_res_index = INT_treatment * RES05_gender * get(index)
+        )
+      
+      # checking that all the variables exist in the set
+      all_vars <- c(dep_var, "INT_treatment", "TEMP_index", "TEMP_X_anytr_index", gpcontrols, "district")
+      if (all(all_vars %in% names(data_filtered))) {
+        # model estimation
+        formula <- as.formula(paste(dep_var, "~ INT_treatment + TEMP_index + TEMP_X_anytr_index +", paste(gpcontrols, collapse = " + "), "+ factor(district)"))
+        model <- tryCatch({
+          lm(formula, data = data_filtered %>% filter(RES05_gender == x))
+        }, error = function(e) {
+          message("Error in model fitting: ", e$message)
+          NULL
+        })
+        
+        if (!is.null(model)) {
+          models_list[[i]] <- model
+          
+          # doing the tests
+          test_1 <- tryCatch({
+            waldtest(model, c("INT_treatment + TEMP_X_anytr_index = 0", paste("TEMP_index =", index_mean)))
+          }, error = function(e) {
+            message("Error in test 1: ", e$message)
+            NULL
+          })
+          
+          if (!is.null(test_1)) {
+            pvals_1[i] <- round(test_1$p.value, 2)
+          } else {
+            pvals_1[i] <- NA
+          }
+          
+          test_2 <- tryCatch({
+            waldtest(model, c("INT_treatment + TEMP_X_anytr_index = 0"))
+          }, error = function(e) {
+            message("Error in test 2: ", e$message)
+            NULL
+          })
+          
+          if (!is.null(test_2)) {
+            pvals_2[i] <- round(test_2$p.value, 2)
+          } else {
+            pvals_2[i] <- NA
+          }
+          
+          # effects
+          effect_average[i] <- coef(model)["INT_treatment"] + coef(model)["TEMP_X_anytr_index"] * index_mean
+          effect_good[i] <- coef(model)["INT_treatment"] + coef(model)["TEMP_X_anytr_index"] * (index_mean + index_sd)
+          effect_bad[i] <- coef(model)["INT_treatment"] + coef(model)["TEMP_X_anytr_index"] * (index_mean - index_sd)
+          
+          # displaying said effects
+          cat("Effects on outcome", dep_var, "\n")
+          cat("Effect of treatment for average performing incumbent is", effect_average[i], "\n")
+          cat("Effect of treatment for +1 sd performing incumbent is", effect_good[i], "\n")
+          cat("Effect of treatment for -1 sd performing incumbent is", effect_bad[i], "\n")
+        } else {
+          message("Model fitting failed for ", dep_var)
+        }
+      } else {
+        message("Some variables are missing in the dataset for ", dep_var)
+      }
+    }
   }
 }
 
+# ## GENERATING THE OUTPUT TABLE ## #
+stargazer(models_list,
+          type = "text",
+          column.labels = paste("Model", 1:length(models_list)),
+          keep = c("INT_treatment", "TEMP_index", "TEMP_X_anytr_index"),
+          add.lines = list(
+            c("District FE", rep("Yes", length(models_list))),
+            c("GP Controls", rep("Yes", length(models_list))),
+            c("Mean in Control not WR in 2005", control_means),
+            c("Test Treat Effect", pvals_1),
+            c("Test Perf Effect in Treat", pvals_2)
+          ),
+          digits = 2,
+          title = "Table 2: Performance - 2010",
+          out = file.path("~/work/Rajasthan-Voters-Replication/Table2_Performance_2010.txt"))
 
 
+## reduced table: 
 
+# Selection of the right models to display
+panel_A_models <- models_list[c(1, 5, 13, 17, 25, 29)]
+panel_B_models <- models_list[c(37, 41, 49, 53, 61, 65)]
 
-
-
-## TABLE
-
-
-# Préparation des modèles pour stargazer
-# Assurez-vous que chaque modèle est nommé correctement pour correspondre à votre structure de tableau
-model_names <- c(
-  "INC05_running", "INC05_voteshare",
-  "INCSPOUSE05_running", "INCSPOUSE05_voteshare",
-  "INCOTHER05_running", "INCOTHER05_voteshare"
-)
-
-# Utilisation de stargazer pour créer le tableau
-stargazer(
-  models_list,
+# Panel A
+panel_A <- stargazer(
+  panel_A_models,
   type = "text",
-  column.labels = model_names,
-  covariate.labels = c(
-    "INT_treatment" = "Treatment",
-    "index_empl_svy_0" = "Performance Index",
-    "INT_treatment:index_empl_svy_0" = "Treatment:Performance"
-  ),
+  column.labels = c("Model 1", "Model 5", "Model 13", "Model 17", "Model 25", "Model 29"),
+  keep = c("INT_treatment", "TEMP_index", "TEMP_X_anytr_index"),
   add.lines = list(
-    c("Observations", sapply(models_list, function(x) if (!is.null(x)) nobs(x) else NA)),
-    c("Mean in Control without GQ", sapply(control_means, function(x) if (!is.null(x)) x else NA))
+    c("District FE", rep("Yes", length(panel_A_models))),
+    c("GP Controls", rep("Yes", length(panel_A_models))),
+    c("Mean in Control not WR in 2005", control_means[c(1, 5, 13, 17, 25, 29)]),
+    c("Test Treat Effect", pvals_1[c(1, 5, 13, 17, 25, 29)]),
+    c("Test Perf Effect in Treat", pvals_2[c(1, 5, 13, 17, 25, 29)])
   ),
   digits = 2,
-  title = "Table 2: Performance",
-  out = "Table2_Performance_2010_completed.txt"
+  title = "Panel A: GP without Gender Quota in 2005",
+  single.row = TRUE
 )
 
-
-
-## problème
-# Assurez-vous que chaque modèle est valide et ne contient pas de valeurs manquantes
-valid_models <- sapply(models_list, function(model) {
-  !is.null(model) && all(!is.na(coef(model)))
-})
-
-models_list <- models_list[valid_models]
-
-# Assurez-vous que les noms des modèles sont corrects
-names(models_list) <- c(
-  "Incumbent Runs", "Incumbent Vote Share",
-  "Incumbent Spouse Runs", "Incumbent Spouse Vote Share",
-  "Other Family Member Runs", "Other Family Member Vote Share"
-)
-
-# Utilisez stargazer pour créer le tableau
-stargazer(
-  models_list,
+# Panel B
+panel_B <- stargazer(
+  panel_B_models,
   type = "text",
-  column.labels = names(models_list),
-  covariate.labels = c(
-    "INT_treatment" = "Treatment",
-    "index_empl_svy_0" = "Performance Index",
-    "INT_treatment:index_empl_svy_0" = "Treatment:Performance"
-  ),
+  column.labels = c("Model 37", "Model 41", "Model 49", "Model 53", "Model 61", "Model 65"),
+  keep = c("INT_treatment", "TEMP_index", "TEMP_X_anytr_index"),
   add.lines = list(
-    c("Observations", sapply(models_list, function(x) nobs(x))),
-    c("Mean in Control without GQ", unlist(control_means))
+    c("District FE", rep("Yes", length(panel_B_models))),
+    c("GP Controls", rep("Yes", length(panel_B_models))),
+    c("Mean in Control not WR in 2005", control_means[c(37, 41, 49, 53, 61, 65)]),
+    c("Test Treat Effect", pvals_1[c(37, 41, 49, 53, 61, 65)]),
+    c("Test Perf Effect in Treat", pvals_2[c(37, 41, 49, 53, 61, 65)])
   ),
   digits = 2,
-  title = "Table 2: Performance",
-  out = "Table2_Performance_2010_completed.txt"
+  title = "Panel B: GP with Gender Quota in 2005",
+  single.row = TRUE
 )
 
+# Combine the two in one txt doc
+combined_output <- c(panel_A, "\n\n", panel_B)
+writeLines(combined_output, file.path("~/work/Rajasthan-Voters-Replication/Table2_Performance_2010_completed.txt"))
 
