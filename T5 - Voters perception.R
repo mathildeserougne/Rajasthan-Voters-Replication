@@ -139,11 +139,47 @@ merged_data_long <- merged_data %>%
 head(merged_data_long)
 
 
-# Afficher les premières lignes du jeu de données transformé
-head(merged_data_long)
 
 
 
+## passons à la suite; standardisation des variables
+
+# Liste des variables à standardiser
+vars_to_standardize <- c(
+  grep("^E_know_", colnames(merged_data_long), value = TRUE),
+  grep("^F_rate_", colnames(merged_data_long), value = TRUE),
+  grep("^E_rate", colnames(merged_data_long), value = TRUE)
+)
+
+# Standardisation des variables pour le sous-ensemble spécifié
+merged_data_long <- merged_data_long %>%
+  group_by(TEMP_id) %>%
+  mutate(
+    across(
+      all_of(vars_to_standardize),
+      ~ ifelse(
+        INT_treatment == 0 & RES05_gender == 0,
+        (`_` - mean(`_`[INT_treatment == 0 & RES05_gender == 0], na.rm = TRUE)) /
+          sd(`_`[INT_treatment == 0 & RES05_gender == 0], na.rm = TRUE),
+        `_`
+      )
+    )
+  ) %>%
+  ungroup()
+
+
+## jusqu'ici ça fonctionne
+
+
+# ce bloc non: 
+# Calcul des moyennes de lignes pour créer de nouvelles variables
+merged_data_long <- merged_data_long %>%
+  mutate(
+    E_know_nregarules = rowMeans(select(., E_know_minimumwage, E_know_maximumdays), na.rm = TRUE),
+    E_know_sarpanchrole = rowMeans(select(., starts_with("E_know_sarpanchrole_")), na.rm = TRUE),
+    E_rate_nrega = rowMeans(select(., E_rate_NREGAimplementation, E_rate_sarpanchperformance), na.rm = TRUE),
+    F_rate_publicgoods = rowMeans(select(., F_rate_publicgoods_road, F_rate_publicgoods_pump, F_rate_publicgoods_school), na.rm = TRUE)
+  )
 
 
 
