@@ -219,11 +219,143 @@ stargazer(models_list,
           out = "Table1_Incumbent_2010_completed.txt")
 ```
 
-Narrower version of the table.
+Non formatted version of the table, to fit into the PDF.
 
 ```{r}
+## CREATE OUTPUT TABLE FOR INCUMBENT ANALYSIS
+create_outreg_table <- function(models_list, incum_dep_vars1, outregvar2, control_means, test_results) {
+  
+  # Function to extract model results
+  extract_model_results <- function(model) {
+    if (is.null(model)) return(NULL)
+    
+    summary_model <- summary(model)
+    coef_table <- summary_model$coefficients
+    
+    results <- list()
+    for (var in outregvar2) {
+      matching_vars <- rownames(coef_table)[grepl(paste0("^", gsub(":", ":", var), "$"), rownames(coef_table))]
+      if (length(matching_vars) > 0) {
+        var_name <- matching_vars[1]
+        coef_val <- coef_table[var_name, "Estimate"]
+        se_val <- coef_table[var_name, "Std. Error"]
+        pval <- coef_table[var_name, "Pr(>|t|)"]
+        
+        # Adding significance stars
+        stars <- if (pval < 0.01) "***" else if (pval < 0.05) "**" else if (pval < 0.1) "*" else ""
+        
+        results[[var]] <- list(
+          coef = round(coef_val, 3),
+          se = round(se_val, 3),
+          pval = pval,
+          stars = stars,
+          coef_formatted = paste0(round(coef_val, 3), stars),
+          se_formatted = paste0("(", round(se_val, 3), ")")
+        )
+      } else {
+        results[[var]] <- list(
+          coef = NA,
+          se = NA,
+          pval = NA,
+          stars = "",
+          coef_formatted = "NA",
+          se_formatted = "(NA)"
+        )
+      }
+    }
+    return(results)
+  }
+  
+  # Create column names
+  col_names <- c("Incumbent Runs", "Incumbent Vote Share",
+                 "Incumbent Spouse Runs", "Incumbent Spouse Vote Share", 
+                 "Other Family Member Runs", "Other Family Member Vote Share")
+  
+  # Initialize the final table
+  final_table <- data.frame(
+    Variable = character(),
+    stringsAsFactors = FALSE
+  )
+  
+  # Add columns for each dependent variable (both any_treatment and gender_general models)
+  for (i in 1:length(incum_dep_vars1)) {
+    final_table[[paste0(col_names[i], "_Any")]] <- character()
+    final_table[[paste0(col_names[i], "_Detailed")]] <- character()
+  }
+  
+  # Extract results for each variable
+  for (var in outregvar2) {
+    # Coefficient row
+    coef_row <- data.frame(Variable = var, stringsAsFactors = FALSE)
+    se_row <- data.frame(Variable = paste0("  ", var, "_se"), stringsAsFactors = FALSE)
+    
+    # For each dependent variable
+    for (i in 1:length(incum_dep_vars1)) {
+      # Any treatment model (first 6 models)
+      any_results <- extract_model_results(models_list[[i]])
+      coef_row[[paste0(col_names[i], "_Any")]] <- if (!is.null(any_results[[var]])) any_results[[var]]$coef_formatted else "NA"
+      se_row[[paste0(col_names[i], "_Any")]] <- if (!is.null(any_results[[var]])) any_results[[var]]$se_formatted else "(NA)"
+      
+      # Gender/General treatment model (models 7-12)
+      detailed_results <- extract_model_results(models_list[[i + length(incum_dep_vars1)]])
+      coef_row[[paste0(col_names[i], "_Detailed")]] <- if (!is.null(detailed_results[[var]])) detailed_results[[var]]$coef_formatted else "NA"
+      se_row[[paste0(col_names[i], "_Detailed")]] <- if (!is.null(detailed_results[[var]])) detailed_results[[var]]$se_formatted else "(NA)"
+    }
+    
+    final_table <- rbind(final_table, coef_row, se_row)
+  }
+  
+  # Add additional statistics rows
+  # Observations
+  obs_row <- data.frame(Variable = "Observations", stringsAsFactors = FALSE)
+  for (i in 1:length(incum_dep_vars1)) {
+    obs_row[[paste0(col_names[i], "_Any")]] <- nobs(models_list[[i]])
+    obs_row[[paste0(col_names[i], "_Detailed")]] <- nobs(models_list[[i + length(incum_dep_vars1)]])
+  }
+  final_table <- rbind(final_table, obs_row)
+  
+  # Control means
+  mean_row <- data.frame(Variable = "Mean in Control without GQ", stringsAsFactors = FALSE)
+  for (i in 1:length(incum_dep_vars1)) {
+    mean_row[[paste0(col_names[i], "_Any")]] <- control_means[[i]]
+    mean_row[[paste0(col_names[i], "_Detailed")]] <- control_means[[i]]
+  }
+  final_table <- rbind(final_table, mean_row)
+  
+  # Test results
+  test1_row <- data.frame(Variable = "Treatment with GQ = Treat without GQ", stringsAsFactors = FALSE)
+  for (i in 1:length(incum_dep_vars1)) {
+    test1_row[[paste0(col_names[i], "_Any")]] <- test_results[[i]]$pval3
+    test1_row[[paste0(col_names[i], "_Detailed")]] <- ""
+  }
+  final_table <- rbind(final_table, test1_row)
+  
+  test2_row <- data.frame(Variable = "Gender Treat = General Treat without GQ", stringsAsFactors = FALSE)
+  for (i in 1:length(incum_dep_vars1)) {
+    test2_row[[paste0(col_names[i], "_Any")]] <- ""
+    test2_row[[paste0(col_names[i], "_Detailed")]] <- test_results[[i + length(incum_dep_vars1)]]$pval3
+  }
+  final_table <- rbind(final_table, test2_row)
+  
+  test3_row <- data.frame(Variable = "Gender Treat = General Treat with GQ", stringsAsFactors = FALSE)
+  for (i in 1:length(incum_dep_vars1)) {
+    test3_row[[paste0(col_names[i], "_Any")]] <- ""
+    test3_row[[paste0(col_names[i], "_Detailed")]] <- test_results[[i + length(incum_dep_vars1)]]$pval4
+  }
+  final_table <- rbind(final_table, test3_row)
+  
+  return(final_table)
+}
 
+# Create the main table
+main_table <- create_outreg_table(models_list, incum_dep_vars1, outregvar2, control_means, test_results)
+
+# Display the table
+print(main_table)
 ```
+
+
+
 
 
 ## Table 2 - Performance 2010
@@ -297,7 +429,7 @@ effect_bad <- numeric(length(incum_dep_vars1) * length(indices))
 ```
 
 Doing the regressions.
-```{r}
+```{r, results='hide'}
 i <- 0
 for (x in 0:1) {
   for (dep_var in incum_dep_vars1) {
@@ -442,6 +574,187 @@ combined_output <- c(panel_A, "\n\n", panel_B)
 writeLines(combined_output, file.path("~/work/Rajasthan-Voters-Replication/Table2_Performance_2010_completed.txt"))
 ```
 
+
+Non formatted table, to fit into the PDF.
+```{r}
+create_reduced_performance_table <- function(models_list, control_means, pvals_1, pvals_2) {
+  
+  # Function to extract model results
+  extract_model_results <- function(model) {
+    if (is.null(model)) return(NULL)
+    
+    summary_model <- summary(model)
+    coef_table <- summary_model$coefficients
+    
+    target_vars <- c("INT_treatment", "TEMP_index", "TEMP_X_anytr_index")
+    
+    results <- list()
+    for (var in target_vars) {
+      if (var %in% rownames(coef_table)) {
+        coef_val <- coef_table[var, "Estimate"]
+        se_val <- coef_table[var, "Std. Error"]
+        pval <- coef_table[var, "Pr(>|t|)"]
+        
+        stars <- if (pval < 0.01) "***" else if (pval < 0.05) "**" else if (pval < 0.1) "*" else ""
+        
+        results[[var]] <- list(
+          coef_formatted = paste0(round(coef_val, 3), stars),
+          se_formatted = paste0("(", round(se_val, 3), ")")
+        )
+      } else {
+        results[[var]] <- list(
+          coef_formatted = "NA",
+          se_formatted = "(NA)"
+        )
+      }
+    }
+    return(results)
+  }
+  
+  # Selection of models to display
+  panel_A_indices <- c(1, 5, 13, 17, 25, 29)
+  panel_B_indices <- c(37, 41, 49, 53, 61, 65)
+  
+  # Column names for the selected models
+  panel_A_cols <- c("Model_1", "Model_5", "Model_13", "Model_17", "Model_25", "Model_29")
+  panel_B_cols <- c("Model_37", "Model_41", "Model_49", "Model_53", "Model_61", "Model_65")
+  
+  # Create Panel A table
+  panel_A_table <- data.frame(Variable = character(), stringsAsFactors = FALSE)
+  for (col in panel_A_cols) {
+    panel_A_table[[col]] <- character()
+  }
+  
+  # Create Panel B table
+  panel_B_table <- data.frame(Variable = character(), stringsAsFactors = FALSE)
+  for (col in panel_B_cols) {
+    panel_B_table[[col]] <- character()
+  }
+  
+  # Variables to extract
+  vars_to_extract <- c("INT_treatment", "TEMP_index", "TEMP_X_anytr_index")
+  
+  # Fill Panel A
+  for (var in vars_to_extract) {
+    coef_row <- data.frame(Variable = var, stringsAsFactors = FALSE)
+    se_row <- data.frame(Variable = paste0("  ", var, "_se"), stringsAsFactors = FALSE)
+    
+    for (i in 1:length(panel_A_indices)) {
+      model_idx <- panel_A_indices[i]
+      col_name <- panel_A_cols[i]
+      
+      if (model_idx <= length(models_list) && !is.null(models_list[[model_idx]])) {
+        results <- extract_model_results(models_list[[model_idx]])
+        coef_row[[col_name]] <- if (!is.null(results[[var]])) results[[var]]$coef_formatted else "NA"
+        se_row[[col_name]] <- if (!is.null(results[[var]])) results[[var]]$se_formatted else "(NA)"
+      } else {
+        coef_row[[col_name]] <- "NA"
+        se_row[[col_name]] <- "(NA)"
+      }
+    }
+    
+    panel_A_table <- rbind(panel_A_table, coef_row, se_row)
+  }
+  
+  # Fill Panel B
+  for (var in vars_to_extract) {
+    coef_row <- data.frame(Variable = var, stringsAsFactors = FALSE)
+    se_row <- data.frame(Variable = paste0("  ", var, "_se"), stringsAsFactors = FALSE)
+    
+    for (i in 1:length(panel_B_indices)) {
+      model_idx <- panel_B_indices[i]
+      col_name <- panel_B_cols[i]
+      
+      if (model_idx <= length(models_list) && !is.null(models_list[[model_idx]])) {
+        results <- extract_model_results(models_list[[model_idx]])
+        coef_row[[col_name]] <- if (!is.null(results[[var]])) results[[var]]$coef_formatted else "NA"
+        se_row[[col_name]] <- if (!is.null(results[[var]])) results[[var]]$se_formatted else "(NA)"
+      } else {
+        coef_row[[col_name]] <- "NA"
+        se_row[[col_name]] <- "(NA)"
+      }
+    }
+    
+    panel_B_table <- rbind(panel_B_table, coef_row, se_row)
+  }
+  
+  # Add additional statistics to Panel A
+  obs_row_A <- data.frame(Variable = "Observations", stringsAsFactors = FALSE)
+  for (i in 1:length(panel_A_indices)) {
+    model_idx <- panel_A_indices[i]
+    col_name <- panel_A_cols[i]
+    
+    if (model_idx <= length(models_list) && !is.null(models_list[[model_idx]])) {
+      obs_row_A[[col_name]] <- nobs(models_list[[model_idx]])
+    } else {
+      obs_row_A[[col_name]] <- "NA"
+    }
+  }
+  panel_A_table <- rbind(panel_A_table, obs_row_A)
+  
+  mean_row_A <- data.frame(Variable = "Mean in Control not WR in 2005", stringsAsFactors = FALSE)
+  for (i in 1:length(panel_A_indices)) {
+    model_idx <- panel_A_indices[i]
+    col_name <- panel_A_cols[i]
+    mean_row_A[[col_name]] <- control_means[model_idx]
+  }
+  panel_A_table <- rbind(panel_A_table, mean_row_A)
+  
+  test1_row_A <- data.frame(Variable = "Test Treat Effect", stringsAsFactors = FALSE)
+  test2_row_A <- data.frame(Variable = "Test Perf Effect in Treat", stringsAsFactors = FALSE)
+  for (i in 1:length(panel_A_indices)) {
+    model_idx <- panel_A_indices[i]
+    col_name <- panel_A_cols[i]
+    test1_row_A[[col_name]] <- pvals_1[model_idx]
+    test2_row_A[[col_name]] <- pvals_2[model_idx]
+  }
+  panel_A_table <- rbind(panel_A_table, test1_row_A, test2_row_A)
+  
+  # Add additional statistics to Panel B
+  obs_row_B <- data.frame(Variable = "Observations", stringsAsFactors = FALSE)
+  for (i in 1:length(panel_B_indices)) {
+    model_idx <- panel_B_indices[i]
+    col_name <- panel_B_cols[i]
+    
+    if (model_idx <= length(models_list) && !is.null(models_list[[model_idx]])) {
+      obs_row_B[[col_name]] <- nobs(models_list[[model_idx]])
+    } else {
+      obs_row_B[[col_name]] <- "NA"
+    }
+  }
+  panel_B_table <- rbind(panel_B_table, obs_row_B)
+  
+  mean_row_B <- data.frame(Variable = "Mean in Control not WR in 2005", stringsAsFactors = FALSE)
+  for (i in 1:length(panel_B_indices)) {
+    model_idx <- panel_B_indices[i]
+    col_name <- panel_B_cols[i]
+    mean_row_B[[col_name]] <- control_means[model_idx]
+  }
+  panel_B_table <- rbind(panel_B_table, mean_row_B)
+  
+  test1_row_B <- data.frame(Variable = "Test Treat Effect", stringsAsFactors = FALSE)
+  test2_row_B <- data.frame(Variable = "Test Perf Effect in Treat", stringsAsFactors = FALSE)
+  for (i in 1:length(panel_B_indices)) {
+    model_idx <- panel_B_indices[i]
+    col_name <- panel_B_cols[i]
+    test1_row_B[[col_name]] <- pvals_1[model_idx]
+    test2_row_B[[col_name]] <- pvals_2[model_idx]
+  }
+  panel_B_table <- rbind(panel_B_table, test1_row_B, test2_row_B)
+  
+  return(list(panel_A = panel_A_table, panel_B = panel_B_table))
+}
+
+# Create the reduced tables
+reduced_tables <- create_reduced_performance_table(models_list, control_means, pvals_1, pvals_2)
+
+# Display the tables
+print("=== PANEL A: GP without Gender Quota in 2005 ===")
+print(reduced_tables$panel_A)
+
+print("\n=== PANEL B: GP with Gender Quota in 2005 ===")
+print(reduced_tables$panel_B)
+```
 
 
 
@@ -632,6 +945,95 @@ writeLines(combined_output, "Table3_Challengers_2010_completed.txt")
 ```
 
 
+Non-formatted table to fit in the PDF: 
+```{r}
+create_outreg_table <- function(results_list_full, results_list_inc, results_list_no_inc) {
+  extract_model_results <- function(model_result) {
+    if (is.null(model_result) || is.null(model_result$model)) return(NULL)
+    
+    model <- model_result$model
+    summary_model <- summary(model)
+    coef_table <- summary_model$coefficients
+    
+    results <- list()
+    for (var in outregvar2) {
+      matching_vars <- rownames(coef_table)[grepl(var, rownames(coef_table))]
+      if (length(matching_vars) > 0) {
+        var_name <- matching_vars[1]
+        coef_val <- coef_table[var_name, "Estimate"]
+        se_val <- coef_table[var_name, "Std. Error"]
+        pval <- coef_table[var_name, "Pr(>|t|)"]
+        
+        stars <- if (pval < 0.01) "***" else if (pval < 0.05) "**" else if (pval < 0.1) "*" else ""
+        
+        results[[var]] <- list(
+          coef = round(coef_val, 3),
+          se = round(se_val, 3),
+          pval = pval,
+          stars = stars,
+          coef_formatted = paste0(round(coef_val, 3), stars),
+          se_formatted = paste0("(", round(se_val, 3), ")")
+        )
+      } else {
+        results[[var]] <- list(
+          coef = NA,
+          se = NA,
+          pval = NA,
+          stars = "",
+          coef_formatted = "NA",
+          se_formatted = "(NA)"
+        )
+      }
+    }
+    return(results)
+  }
+  
+  final_table <- data.frame(
+    Variable = character(),
+    Full_Sample = character(),
+    Inc_Can_Run = character(),
+    Inc_Cannot_Run = character(),
+    stringsAsFactors = FALSE
+  )
+  
+  for (i in seq_along(dep_vars)) {
+    dep_var <- dep_vars[i]
+    full_results <- if (i <= length(results_list_full)) extract_model_results(results_list_full[[i]]) else NULL
+    inc_results <- if (i <= length(results_list_inc)) extract_model_results(results_list_inc[[i]]) else NULL
+    no_inc_results <- if (i <= length(results_list_no_inc)) extract_model_results(results_list_no_inc[[i]]) else NULL
+    
+    for (var in outregvar2) {
+      coef_row <- data.frame(
+        Variable = var,
+        Full_Sample = if (!is.null(full_results[[var]])) full_results[[var]]$coef_formatted else "NA",
+        Inc_Can_Run = if (!is.null(inc_results[[var]])) inc_results[[var]]$coef_formatted else "NA",
+        Inc_Cannot_Run = if (!is.null(no_inc_results[[var]])) no_inc_results[[var]]$coef_formatted else "NA",
+        stringsAsFactors = FALSE
+      )
+      
+      se_row <- data.frame(
+        Variable = paste0("  ", var, "_se"),
+        Full_Sample = if (!is.null(full_results[[var]])) full_results[[var]]$se_formatted else "(NA)",
+        Inc_Can_Run = if (!is.null(inc_results[[var]])) inc_results[[var]]$se_formatted else "(NA)",
+        Inc_Cannot_Run = if (!is.null(no_inc_results[[var]])) no_inc_results[[var]]$se_formatted else "(NA)",
+        stringsAsFactors = FALSE
+      )
+      
+      final_table <- rbind(final_table, coef_row, se_row)
+    }
+  }
+  
+  return(final_table)
+}
+
+main_table <- create_outreg_table(results_full, results_inc_can, results_inc_cannot)
+print(main_table)
+```
+
+
+
+
+
 ## Table 4- Candidates 2015
 
 Required libraries.
@@ -738,6 +1140,84 @@ stargazer(models_list,
           title = "Table 4: Effects on Candidates - 2015",
           out = file.path("~/work/Rajasthan-Voters-Replication/Table4_Candidates_2015.txt"))
 
+```
+
+
+Non formatted table to fit into the PDF.
+```{r}
+create_regression_table <- function(models_list, dep_vars, outregvar2) {
+  extract_model_results <- function(model) {
+    if (is.null(model)) return(NULL)
+    
+    summary_model <- summary(model)
+    coef_table <- summary_model$coefficients
+    
+    results <- list()
+    for (var in outregvar2) {
+      if (var %in% rownames(coef_table)) {
+        coef_val <- coef_table[var, "Estimate"]
+        se_val <- coef_table[var, "Std. Error"]
+        pval <- coef_table[var, "Pr(>|t|)"]
+        
+        stars <- if (pval < 0.01) "***" else if (pval < 0.05) "**" else if (pval < 0.1) "*" else ""
+        
+        results[[var]] <- list(
+          coef = round(coef_val, 3),
+          se = round(se_val, 3),
+          pval = pval,
+          stars = stars,
+          coef_formatted = paste0(round(coef_val, 3), stars),
+          se_formatted = paste0("(", round(se_val, 3), ")")
+        )
+      } else {
+        results[[var]] <- list(
+          coef = NA,
+          se = NA,
+          pval = NA,
+          stars = "",
+          coef_formatted = "NA",
+          se_formatted = "(NA)"
+        )
+      }
+    }
+    return(results)
+  }
+  
+  final_table <- data.frame(
+    Variable = character(),
+    stringsAsFactors = FALSE
+  )
+  
+  for (i in seq_along(dep_vars)) {
+    dep_var <- dep_vars[i]
+    model_results <- extract_model_results(models_list[[i]])
+    
+    for (var in outregvar2) {
+      coef_row <- data.frame(
+        Variable = var,
+        stringsAsFactors = FALSE
+      )
+      
+      se_row <- data.frame(
+        Variable = paste0("  ", var, "_se"),
+        stringsAsFactors = FALSE
+      )
+      
+      for (j in seq_along(models_list)) {
+        col_name <- paste0("Model_", j)
+        coef_row[[col_name]] <- if (!is.null(model_results[[var]])) model_results[[var]]$coef_formatted else "NA"
+        se_row[[col_name]] <- if (!is.null(model_results[[var]])) model_results[[var]]$se_formatted else "(NA)"
+      }
+      
+      final_table <- rbind(final_table, coef_row, se_row)
+    }
+  }
+  
+  return(final_table)
+}
+
+regression_table <- create_regression_table(models_list, dep_vars, outregvar2)
+print(regression_table)
 ```
 
 

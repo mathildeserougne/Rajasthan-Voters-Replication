@@ -217,3 +217,190 @@ panel_B <- stargazer(
 combined_output <- c(panel_A, "\n\n", panel_B)
 writeLines(combined_output, file.path("~/work/Rajasthan-Voters-Replication/Table2_Performance_2010_completed.txt"))
 
+
+
+
+### non formatted table to fit into the pdf!!
+
+## CREATE REDUCED TABLE WITH SELECTED MODELS
+create_reduced_performance_table <- function(models_list, control_means, pvals_1, pvals_2) {
+  
+  # Function to extract model results
+  extract_model_results <- function(model) {
+    if (is.null(model)) return(NULL)
+    
+    summary_model <- summary(model)
+    coef_table <- summary_model$coefficients
+    
+    target_vars <- c("INT_treatment", "TEMP_index", "TEMP_X_anytr_index")
+    
+    results <- list()
+    for (var in target_vars) {
+      if (var %in% rownames(coef_table)) {
+        coef_val <- coef_table[var, "Estimate"]
+        se_val <- coef_table[var, "Std. Error"]
+        pval <- coef_table[var, "Pr(>|t|)"]
+        
+        stars <- if (pval < 0.01) "***" else if (pval < 0.05) "**" else if (pval < 0.1) "*" else ""
+        
+        results[[var]] <- list(
+          coef_formatted = paste0(round(coef_val, 3), stars),
+          se_formatted = paste0("(", round(se_val, 3), ")")
+        )
+      } else {
+        results[[var]] <- list(
+          coef_formatted = "NA",
+          se_formatted = "(NA)"
+        )
+      }
+    }
+    return(results)
+  }
+  
+  # Selection of models to display
+  panel_A_indices <- c(1, 5, 13, 17, 25, 29)
+  panel_B_indices <- c(37, 41, 49, 53, 61, 65)
+  
+  # Column names for the selected models
+  panel_A_cols <- c("Model_1", "Model_5", "Model_13", "Model_17", "Model_25", "Model_29")
+  panel_B_cols <- c("Model_37", "Model_41", "Model_49", "Model_53", "Model_61", "Model_65")
+  
+  # Create Panel A table
+  panel_A_table <- data.frame(Variable = character(), stringsAsFactors = FALSE)
+  for (col in panel_A_cols) {
+    panel_A_table[[col]] <- character()
+  }
+  
+  # Create Panel B table
+  panel_B_table <- data.frame(Variable = character(), stringsAsFactors = FALSE)
+  for (col in panel_B_cols) {
+    panel_B_table[[col]] <- character()
+  }
+  
+  # Variables to extract
+  vars_to_extract <- c("INT_treatment", "TEMP_index", "TEMP_X_anytr_index")
+  
+  # Fill Panel A
+  for (var in vars_to_extract) {
+    coef_row <- data.frame(Variable = var, stringsAsFactors = FALSE)
+    se_row <- data.frame(Variable = paste0("  ", var, "_se"), stringsAsFactors = FALSE)
+    
+    for (i in 1:length(panel_A_indices)) {
+      model_idx <- panel_A_indices[i]
+      col_name <- panel_A_cols[i]
+      
+      if (model_idx <= length(models_list) && !is.null(models_list[[model_idx]])) {
+        results <- extract_model_results(models_list[[model_idx]])
+        coef_row[[col_name]] <- if (!is.null(results[[var]])) results[[var]]$coef_formatted else "NA"
+        se_row[[col_name]] <- if (!is.null(results[[var]])) results[[var]]$se_formatted else "(NA)"
+      } else {
+        coef_row[[col_name]] <- "NA"
+        se_row[[col_name]] <- "(NA)"
+      }
+    }
+    
+    panel_A_table <- rbind(panel_A_table, coef_row, se_row)
+  }
+  
+  # Fill Panel B
+  for (var in vars_to_extract) {
+    coef_row <- data.frame(Variable = var, stringsAsFactors = FALSE)
+    se_row <- data.frame(Variable = paste0("  ", var, "_se"), stringsAsFactors = FALSE)
+    
+    for (i in 1:length(panel_B_indices)) {
+      model_idx <- panel_B_indices[i]
+      col_name <- panel_B_cols[i]
+      
+      if (model_idx <= length(models_list) && !is.null(models_list[[model_idx]])) {
+        results <- extract_model_results(models_list[[model_idx]])
+        coef_row[[col_name]] <- if (!is.null(results[[var]])) results[[var]]$coef_formatted else "NA"
+        se_row[[col_name]] <- if (!is.null(results[[var]])) results[[var]]$se_formatted else "(NA)"
+      } else {
+        coef_row[[col_name]] <- "NA"
+        se_row[[col_name]] <- "(NA)"
+      }
+    }
+    
+    panel_B_table <- rbind(panel_B_table, coef_row, se_row)
+  }
+  
+  # Add additional statistics to Panel A
+  obs_row_A <- data.frame(Variable = "Observations", stringsAsFactors = FALSE)
+  for (i in 1:length(panel_A_indices)) {
+    model_idx <- panel_A_indices[i]
+    col_name <- panel_A_cols[i]
+    
+    if (model_idx <= length(models_list) && !is.null(models_list[[model_idx]])) {
+      obs_row_A[[col_name]] <- nobs(models_list[[model_idx]])
+    } else {
+      obs_row_A[[col_name]] <- "NA"
+    }
+  }
+  panel_A_table <- rbind(panel_A_table, obs_row_A)
+  
+  mean_row_A <- data.frame(Variable = "Mean in Control not WR in 2005", stringsAsFactors = FALSE)
+  for (i in 1:length(panel_A_indices)) {
+    model_idx <- panel_A_indices[i]
+    col_name <- panel_A_cols[i]
+    mean_row_A[[col_name]] <- control_means[model_idx]
+  }
+  panel_A_table <- rbind(panel_A_table, mean_row_A)
+  
+  test1_row_A <- data.frame(Variable = "Test Treat Effect", stringsAsFactors = FALSE)
+  test2_row_A <- data.frame(Variable = "Test Perf Effect in Treat", stringsAsFactors = FALSE)
+  for (i in 1:length(panel_A_indices)) {
+    model_idx <- panel_A_indices[i]
+    col_name <- panel_A_cols[i]
+    test1_row_A[[col_name]] <- pvals_1[model_idx]
+    test2_row_A[[col_name]] <- pvals_2[model_idx]
+  }
+  panel_A_table <- rbind(panel_A_table, test1_row_A, test2_row_A)
+  
+  # Add additional statistics to Panel B
+  obs_row_B <- data.frame(Variable = "Observations", stringsAsFactors = FALSE)
+  for (i in 1:length(panel_B_indices)) {
+    model_idx <- panel_B_indices[i]
+    col_name <- panel_B_cols[i]
+    
+    if (model_idx <= length(models_list) && !is.null(models_list[[model_idx]])) {
+      obs_row_B[[col_name]] <- nobs(models_list[[model_idx]])
+    } else {
+      obs_row_B[[col_name]] <- "NA"
+    }
+  }
+  panel_B_table <- rbind(panel_B_table, obs_row_B)
+  
+  mean_row_B <- data.frame(Variable = "Mean in Control not WR in 2005", stringsAsFactors = FALSE)
+  for (i in 1:length(panel_B_indices)) {
+    model_idx <- panel_B_indices[i]
+    col_name <- panel_B_cols[i]
+    mean_row_B[[col_name]] <- control_means[model_idx]
+  }
+  panel_B_table <- rbind(panel_B_table, mean_row_B)
+  
+  test1_row_B <- data.frame(Variable = "Test Treat Effect", stringsAsFactors = FALSE)
+  test2_row_B <- data.frame(Variable = "Test Perf Effect in Treat", stringsAsFactors = FALSE)
+  for (i in 1:length(panel_B_indices)) {
+    model_idx <- panel_B_indices[i]
+    col_name <- panel_B_cols[i]
+    test1_row_B[[col_name]] <- pvals_1[model_idx]
+    test2_row_B[[col_name]] <- pvals_2[model_idx]
+  }
+  panel_B_table <- rbind(panel_B_table, test1_row_B, test2_row_B)
+  
+  return(list(panel_A = panel_A_table, panel_B = panel_B_table))
+}
+
+# Create the reduced tables
+reduced_tables <- create_reduced_performance_table(models_list, control_means, pvals_1, pvals_2)
+
+# Display the tables
+print("=== PANEL A: GP without Gender Quota in 2005 ===")
+print(reduced_tables$panel_A)
+
+print("\n=== PANEL B: GP with Gender Quota in 2005 ===")
+print(reduced_tables$panel_B)
+
+
+
+

@@ -108,4 +108,89 @@ stargazer(models_list,
 
 # it's weird because it corresponds to the output of the Sata code.
 # but not to the table 4 in the paper ? 
-# i have to ask
+
+
+
+
+
+
+
+
+## non formatted table to fit into the pdf!!
+
+create_regression_table <- function(models_list, dep_vars, outregvar2) {
+  extract_model_results <- function(model) {
+    if (is.null(model)) return(NULL)
+    
+    summary_model <- summary(model)
+    coef_table <- summary_model$coefficients
+    
+    results <- list()
+    for (var in outregvar2) {
+      if (var %in% rownames(coef_table)) {
+        coef_val <- coef_table[var, "Estimate"]
+        se_val <- coef_table[var, "Std. Error"]
+        pval <- coef_table[var, "Pr(>|t|)"]
+        
+        stars <- if (pval < 0.01) "***" else if (pval < 0.05) "**" else if (pval < 0.1) "*" else ""
+        
+        results[[var]] <- list(
+          coef = round(coef_val, 3),
+          se = round(se_val, 3),
+          pval = pval,
+          stars = stars,
+          coef_formatted = paste0(round(coef_val, 3), stars),
+          se_formatted = paste0("(", round(se_val, 3), ")")
+        )
+      } else {
+        results[[var]] <- list(
+          coef = NA,
+          se = NA,
+          pval = NA,
+          stars = "",
+          coef_formatted = "NA",
+          se_formatted = "(NA)"
+        )
+      }
+    }
+    return(results)
+  }
+  
+  final_table <- data.frame(
+    Variable = character(),
+    stringsAsFactors = FALSE
+  )
+  
+  for (i in seq_along(dep_vars)) {
+    dep_var <- dep_vars[i]
+    model_results <- extract_model_results(models_list[[i]])
+    
+    for (var in outregvar2) {
+      coef_row <- data.frame(
+        Variable = var,
+        stringsAsFactors = FALSE
+      )
+      
+      se_row <- data.frame(
+        Variable = paste0("  ", var, "_se"),
+        stringsAsFactors = FALSE
+      )
+      
+      for (j in seq_along(models_list)) {
+        col_name <- paste0("Model_", j)
+        coef_row[[col_name]] <- if (!is.null(model_results[[var]])) model_results[[var]]$coef_formatted else "NA"
+        se_row[[col_name]] <- if (!is.null(model_results[[var]])) model_results[[var]]$se_formatted else "(NA)"
+      }
+      
+      final_table <- rbind(final_table, coef_row, se_row)
+    }
+  }
+  
+  return(final_table)
+}
+
+regression_table <- create_regression_table(models_list, dep_vars, outregvar2)
+print(regression_table)
+
+
+

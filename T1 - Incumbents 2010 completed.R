@@ -330,3 +330,146 @@ stargazer(panel_A_models,
           notes.append = FALSE,
           notes = "(1)-(2) Incumbent, (3)-(4) Spouse, (5)-(6) Other; Odd cols=Run, Even cols=Vote",
           header = FALSE)
+
+
+
+
+### non formatted version to fit the PDF!
+
+## CREATE OUTPUT TABLE FOR INCUMBENT ANALYSIS
+create_outreg_table <- function(models_list, incum_dep_vars1, outregvar2, control_means, test_results) {
+  
+  # Function to extract model results
+  extract_model_results <- function(model) {
+    if (is.null(model)) return(NULL)
+    
+    summary_model <- summary(model)
+    coef_table <- summary_model$coefficients
+    
+    results <- list()
+    for (var in outregvar2) {
+      matching_vars <- rownames(coef_table)[grepl(paste0("^", gsub(":", ":", var), "$"), rownames(coef_table))]
+      if (length(matching_vars) > 0) {
+        var_name <- matching_vars[1]
+        coef_val <- coef_table[var_name, "Estimate"]
+        se_val <- coef_table[var_name, "Std. Error"]
+        pval <- coef_table[var_name, "Pr(>|t|)"]
+        
+        # Adding significance stars
+        stars <- if (pval < 0.01) "***" else if (pval < 0.05) "**" else if (pval < 0.1) "*" else ""
+        
+        results[[var]] <- list(
+          coef = round(coef_val, 3),
+          se = round(se_val, 3),
+          pval = pval,
+          stars = stars,
+          coef_formatted = paste0(round(coef_val, 3), stars),
+          se_formatted = paste0("(", round(se_val, 3), ")")
+        )
+      } else {
+        results[[var]] <- list(
+          coef = NA,
+          se = NA,
+          pval = NA,
+          stars = "",
+          coef_formatted = "NA",
+          se_formatted = "(NA)"
+        )
+      }
+    }
+    return(results)
+  }
+  
+  # Create column names
+  col_names <- c("Incumbent Runs", "Incumbent Vote Share",
+                 "Incumbent Spouse Runs", "Incumbent Spouse Vote Share", 
+                 "Other Family Member Runs", "Other Family Member Vote Share")
+  
+  # Initialize the final table
+  final_table <- data.frame(
+    Variable = character(),
+    stringsAsFactors = FALSE
+  )
+  
+  # Add columns for each dependent variable (both any_treatment and gender_general models)
+  for (i in 1:length(incum_dep_vars1)) {
+    final_table[[paste0(col_names[i], "_Any")]] <- character()
+    final_table[[paste0(col_names[i], "_Detailed")]] <- character()
+  }
+  
+  # Extract results for each variable
+  for (var in outregvar2) {
+    # Coefficient row
+    coef_row <- data.frame(Variable = var, stringsAsFactors = FALSE)
+    se_row <- data.frame(Variable = paste0("  ", var, "_se"), stringsAsFactors = FALSE)
+    
+    # For each dependent variable
+    for (i in 1:length(incum_dep_vars1)) {
+      # Any treatment model (first 6 models)
+      any_results <- extract_model_results(models_list[[i]])
+      coef_row[[paste0(col_names[i], "_Any")]] <- if (!is.null(any_results[[var]])) any_results[[var]]$coef_formatted else "NA"
+      se_row[[paste0(col_names[i], "_Any")]] <- if (!is.null(any_results[[var]])) any_results[[var]]$se_formatted else "(NA)"
+      
+      # Gender/General treatment model (models 7-12)
+      detailed_results <- extract_model_results(models_list[[i + length(incum_dep_vars1)]])
+      coef_row[[paste0(col_names[i], "_Detailed")]] <- if (!is.null(detailed_results[[var]])) detailed_results[[var]]$coef_formatted else "NA"
+      se_row[[paste0(col_names[i], "_Detailed")]] <- if (!is.null(detailed_results[[var]])) detailed_results[[var]]$se_formatted else "(NA)"
+    }
+    
+    final_table <- rbind(final_table, coef_row, se_row)
+  }
+  
+  # Add additional statistics rows
+  # Observations
+  obs_row <- data.frame(Variable = "Observations", stringsAsFactors = FALSE)
+  for (i in 1:length(incum_dep_vars1)) {
+    obs_row[[paste0(col_names[i], "_Any")]] <- nobs(models_list[[i]])
+    obs_row[[paste0(col_names[i], "_Detailed")]] <- nobs(models_list[[i + length(incum_dep_vars1)]])
+  }
+  final_table <- rbind(final_table, obs_row)
+  
+  # Control means
+  mean_row <- data.frame(Variable = "Mean in Control without GQ", stringsAsFactors = FALSE)
+  for (i in 1:length(incum_dep_vars1)) {
+    mean_row[[paste0(col_names[i], "_Any")]] <- control_means[[i]]
+    mean_row[[paste0(col_names[i], "_Detailed")]] <- control_means[[i]]
+  }
+  final_table <- rbind(final_table, mean_row)
+  
+  # Test results
+  test1_row <- data.frame(Variable = "Treatment with GQ = Treat without GQ", stringsAsFactors = FALSE)
+  for (i in 1:length(incum_dep_vars1)) {
+    test1_row[[paste0(col_names[i], "_Any")]] <- test_results[[i]]$pval3
+    test1_row[[paste0(col_names[i], "_Detailed")]] <- ""
+  }
+  final_table <- rbind(final_table, test1_row)
+  
+  test2_row <- data.frame(Variable = "Gender Treat = General Treat without GQ", stringsAsFactors = FALSE)
+  for (i in 1:length(incum_dep_vars1)) {
+    test2_row[[paste0(col_names[i], "_Any")]] <- ""
+    test2_row[[paste0(col_names[i], "_Detailed")]] <- test_results[[i + length(incum_dep_vars1)]]$pval3
+  }
+  final_table <- rbind(final_table, test2_row)
+  
+  test3_row <- data.frame(Variable = "Gender Treat = General Treat with GQ", stringsAsFactors = FALSE)
+  for (i in 1:length(incum_dep_vars1)) {
+    test3_row[[paste0(col_names[i], "_Any")]] <- ""
+    test3_row[[paste0(col_names[i], "_Detailed")]] <- test_results[[i + length(incum_dep_vars1)]]$pval4
+  }
+  final_table <- rbind(final_table, test3_row)
+  
+  return(final_table)
+}
+
+# Create the main table
+main_table <- create_outreg_table(models_list, incum_dep_vars1, outregvar2, control_means, test_results)
+
+# Display the table
+print(main_table)
+
+# Optional: Save as CSV
+# write.csv(main_table, "incumbent_regression_results.csv", row.names = FALSE)
+
+# Optional: Create a more formatted table using knitr
+library(knitr)
+kable(main_table, caption = "Table 1: Incumbent and Incumbent's Family Entry")
