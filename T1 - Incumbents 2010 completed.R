@@ -466,10 +466,3 @@ main_table <- create_outreg_table(models_list, incum_dep_vars1, outregvar2, cont
 
 # Display the table
 print(main_table)
-
-# Optional: Save as CSV
-# write.csv(main_table, "incumbent_regression_results.csv", row.names = FALSE)
-
-# Optional: Create a more formatted table using knitr
-library(knitr)
-kable(main_table, caption = "Table 1: Incumbent and Incumbent's Family Entry")

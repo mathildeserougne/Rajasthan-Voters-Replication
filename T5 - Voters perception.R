@@ -86,12 +86,11 @@ merged_data <- household_data %>%
 
 
 
-
+# until now, pretty sure it's normal
 
 
 ## reshape ##
 
-# Utilisation du dataframe merged_data
 df <- merged_data %>%
   select(
     district, ps, gp, ID_gp_no,
@@ -109,11 +108,13 @@ df <- merged_data %>%
 
 
 
-# Ajout d'un identifiant temporaire
+# temporary id
 df <- df %>%
   mutate(TEMP_id = row_number())
 
-# Remodelage des données
+
+# VERSION CORRIGEE DE L'UTILISATION DE PIVOT ::
+# question of pivot
 df_long <- df %>%
   pivot_longer(
     cols = c(
@@ -121,19 +122,20 @@ df_long <- df %>%
       starts_with("D_NREGA_work"), starts_with("E_know"), starts_with("E_rate"),
       starts_with("F_rank"), starts_with("F_rate_publicgoods"), starts_with("F_optimistic")
     ),
-    names_to = "variable",
-    values_to = "value"
-  ) %>%
+    names_to = c(".value","gender"),
+    names_sep="_(?=[mf]$)"
+    
+      ) 
+%>%
   separate(variable, into = c("prefix", "gender"), sep = "_(?=[mf]$)", fill = "right") %>%
   pivot_wider(
     names_from = prefix,
     values_from = value
   )
 
-# Vérification du nom des colonnes après reshape
+# colnames to check
 print(colnames(df_long))
 
-# Pour s'assurer que A_age, A_educ, A_literacy existent
 df_long <- df_long %>%
   rename(
     A_age = A_age,
@@ -141,7 +143,7 @@ df_long <- df_long %>%
     A_literacy = A_literacy
   )
 
-# Nettoyage et création des variables d'intérêt
+# cleaning and interest variables
 df_reshaped <- df_long %>%
   mutate(
     A_age = as.numeric(A_age),
@@ -170,7 +172,7 @@ df_reshaped <- df_long %>%
     C_H_Missing = is.na(H_bpl) | is.na(H_ownland) | is.na(H_religion) | is.na(H_caste)
   )
 
-# Affichage pour vérifier
+# check
 head(df_reshaped)
 
 
@@ -200,7 +202,7 @@ df_reshaped <- df_reshaped %>%
 
 
 
-# creation des indices composites
+# composites
 df_reshaped <- df_reshaped %>%
   mutate(
     E_know_nregarules = rowMeans(select(., E_know_minimumwage, E_know_maximumdays), na.rm = TRUE),
@@ -250,33 +252,9 @@ df_reshaped <- df_reshaped %>%
   ))
 
 
-# indices
-df_reshaped <- df_reshaped %>%
-  rowwise() %>%
-  mutate(
-    E_know_nregarules = mean(c_across(c(E_know_minimumwage, E_know_maximumdays)), na.rm = TRUE),
-    E_know_sarpanchrole = mean(c_across(starts_with("E_know_sarpanchrole_")), na.rm = TRUE),
-    E_rate_nrega = mean(c_across(c(E_rate_NREGAimplementation, E_rate_sarpanchperformance)), na.rm = TRUE),
-    F_rate_publicgoods = mean(c_across(c(F_rate_publicgoods_road, F_rate_publicgoods_pump, F_rate_publicgoods_school)), na.rm = TRUE)
-  ) %>%
-  ungroup()
 
 
-indices <- c("E_know_nregarules", "E_know_sarpanchrole", "E_rate_nrega", "F_rate_publicgoods")
 
-for (index in indices) {
-  df_reshaped <- df_reshaped %>%
-    mutate(
-      !!paste0("TEMP_index_", index) := .data[[index]],
-      !!paste0("TEMP_X_res_index_", index) := RES05_gender * .data[[index]],
-      !!paste0("TEMP_X_anytr_index_", index) := INT_treatment * .data[[index]],
-      !!paste0("TEMP_X_grltr_index_", index) := INT_treatment_general * .data[[index]],
-      !!paste0("TEMP_X_gndtr_index_", index) := INT_treatment_gender * .data[[index]],
-      !!paste0("TEMP_X_anytr_res_index_", index) := INT_treatment * RES05_gender * .data[[index]],
-      !!paste0("TEMP_X_grltr_res_index_", index) := INT_treatment_general * RES05_gender * .data[[index]],
-      !!paste0("TEMP_X_gndtr_res_index_", index) := INT_treatment_gender * RES05_gender * .data[[index]]
-    )
-}
 
 
 
