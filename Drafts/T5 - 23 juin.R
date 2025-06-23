@@ -125,7 +125,7 @@ df_long <- df %>%
     names_to = c(".value","gender"),
     names_sep="_(?=[mf]$)"
     
-      ) 
+  ) 
 # %>%
 #   separate(variable, into = c("prefix", "gender"), sep = "_(?=[mf]$)", fill = "right") %>%
 #   pivot_wider(
@@ -182,34 +182,9 @@ head(df_reshaped)
 
 
 
+## tentative régression 23 / 06
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-## poubelle temporaire (au 23 juin)
-
-## controls ##
-
-library(dplyr)
-library(stringr)
-
-# Centrage et réduction des variables E_know_*, F_rate_*, E_rate* pour les individus de contrôle (INT_treatment==0 & RES05_gender==0)
+# Standardiser les variables E_know_*, F_rate_*, E_rate* pour les individus de contrôle
 vars_to_scale <- df_reshaped %>%
   select(starts_with("E_know_"), starts_with("F_rate_"), starts_with("E_rate")) %>%
   select(where(is.numeric)) %>%
@@ -225,9 +200,7 @@ df_reshaped <- df_reshaped %>%
     (. - mu) / sigma
   }, .names = "{.col}"))
 
-
-
-# composites
+# Créer des variables composites
 df_reshaped <- df_reshaped %>%
   mutate(
     E_know_nregarules = rowMeans(select(., E_know_minimumwage, E_know_maximumdays), na.rm = TRUE),
@@ -236,9 +209,7 @@ df_reshaped <- df_reshaped %>%
     F_rate_publicgoods = rowMeans(select(., F_rate_publicgoods_road, F_rate_publicgoods_pump, F_rate_publicgoods_school), na.rm = TRUE)
   )
 
-
-# variables d'interaction
-
+# Variables d'interaction
 indices <- c("E_know_nregarules", "E_know_sarpanchrole", "E_rate_nrega", "F_rate_publicgoods")
 
 for (index in indices) {
@@ -255,58 +226,26 @@ for (index in indices) {
     )
 }
 
-
-
-## control variables
-
-install.packages("fixest")
-install.packages("modelsummary")
-library(dplyr)
-library(fixest)
-library(modelsummary)
-
 # Définir les variables de contrôle
-indcontrols <- grep("^C_I_", names(data), value = TRUE)
-hhcontrols  <- grep("^C_H_", names(data), value = TRUE)
-gpcontrols  <- grep("^std_HH_NREGA", names(data), value = TRUE)
+indcontrols <- grep("^C_I_", names(df_reshaped), value = TRUE)
+hhcontrols <- grep("^C_H_", names(df_reshaped), value = TRUE)
+gpcontrols <- grep("^std_HH_NREGA", names(df_reshaped), value = TRUE)
 
-standardize_vars <- grep("^E_know_|^F_rate_|^E_rate", names(df_reshaped), value = TRUE)
-
-df_reshaped <- df_reshaped %>%
-  mutate(across(
-    all_of(standardize_vars),
-    ~ ifelse(INT_treatment == 0 & RES05_gender == 0, as.numeric(scale(.x)), .x)
-  ))
-
-
-
-
-
-
-
-
-# regressions
-
+# Exécuter les régressions et stocker les résultats
 results_list <- list()
 i <- 1
 
 for (dep_var in indices) {
-  # Moyennes dans le groupe de contrôle
   control_mean1 <- mean(df_reshaped[[dep_var]][df_reshaped$INT_treatment == 0 & df_reshaped$RES05_gender == 0], na.rm = TRUE)
   control_mean2 <- mean(df_reshaped[[dep_var]][df_reshaped$INT_treatment == 0 & df_reshaped$RES05_gender == 1], na.rm = TRUE)
   
-  # Variable TEMP_index spécifique
   temp_index_var <- paste0("TEMP_index_", dep_var)
   
-  # Construire la formule classique (sans effets fixes)
-  rhs_vars <- c(temp_index_var, gpcontrols, indcontrols, hhcontrols)
-  fmla_str <- paste(dep_var, "~", paste(rhs_vars, collapse = " + "))
+  fmla_str <- paste(dep_var, "~", paste(c(temp_index_var, gpcontrols, indcontrols, hhcontrols), collapse = " + "))
   formula <- as.formula(fmla_str)
   
-  # Faire la régression avec fixef en vecteur de noms de colonnes
   model <- feols(formula, fixef = "district", cluster = "ID_gp_no", data = df_reshaped)
   
-  # Stocker le résultat + moyennes contrôle
   results_list[[paste0("Model_", i)]] <- model
   attr(results_list[[paste0("Model_", i)]], "control_mean1") <- control_mean1
   attr(results_list[[paste0("Model_", i)]], "control_mean2") <- control_mean2
@@ -314,204 +253,36 @@ for (dep_var in indices) {
   i <- i + 1
 }
 
+# Afficher les résultats des régressions
+modelsummary(results_list, output = "default", stars = TRUE, gof_map = c("nobs", "r.squared"))
 
 
 
+## marche pas
 
+# Vérifiez les valeurs manquantes dans votre dataframe
+summary(df_reshaped)
 
 
 
+# gestion des valeurs manquantes
+install.packages("mice")
+library(mice)
+# Imputation des valeurs manquantes
+imputed_data <- mice(df_reshaped, m = 1, method = "mean", maxit = 50, seed = 500)
+df_imputed <- complete(imputed_data)
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-### poubelle
-
-
-
-# Utilisation du dataframe merged_data
-df <- merged_data
-
-# Sélection des variables disponibles
-df <- df %>%
-  select(
-    district, ps, gp, ID_gp_no,
-    starts_with("A_age"), starts_with("A_educ"), starts_with("A_literacy"),
-    starts_with("D_NREGA_work"), starts_with("E_know"), starts_with("E_rate"),
-    starts_with("F_rank"), starts_with("F_rate_publicgoods"), starts_with("F_optimistic"),
-    H_bpl, H_ownland, H_participates_nrega, H_religion, H_caste,
-    ELEC10_electorate_total, ELEC10_electorate_total_missing,
-    starts_with("RES00"), starts_with("RES10"), starts_with("RES05"),
-    starts_with("INT_"), starts_with("X_"), starts_with("index"),
-    starts_with("std_HH_NREGA")
-  )
-
-# Ajout d'un identifiant temporaire
-df <- df %>%
-  mutate(TEMP_id = row_number())
-
-# Remodelage des données
-df_reshaped <- df %>%
-  pivot_longer(
-    cols = c(
-      starts_with("A_age"), starts_with("A_educ"), starts_with("A_literacy"),
-      starts_with("D_NREGA_work"), starts_with("E_know"), starts_with("E_rate"),
-      starts_with("F_rank"), starts_with("F_rate_publicgoods"), starts_with("F_optimistic")
-    ),
-    names_to = "variable",
-    values_to = "value"
-  ) %>%
-  separate(variable, into = c("variable_prefix", "gender"), sep = "_", fill = "right") %>%
-  pivot_wider(
-    names_from = variable_prefix,
-    values_from = value
-  )
-
-
-## poubelle
-
-
-
-
-# Transformation des données de wide à long
-merged_data_long <- merged_data %>%
-  mutate(TEMP_id = row_number()) %>%
-  pivot_longer(
-    cols = c(
-      starts_with("A_age"), starts_with("A_educ"), starts_with("A_literacy"),
-      D_NREGA_work_m, D_NREGA_work_f, starts_with("E_know"),
-      starts_with("E_rate"), starts_with("F_rank"),
-      starts_with("F_rate_publicgoods"), starts_with("F_optimistic")
-    ),
-    names_to = c("var_prefix", "gender"),
-    values_to = "value",
-    names_pattern = "([^_]+)_([^_]+)"
-  ) %>%
-  mutate(
-    A_age = as.numeric(ifelse(var_prefix == "A_age", value, NA)),
-    A_educ = as.numeric(ifelse(var_prefix == "A_educ", value, NA)),
-    A_literacy = as.numeric(ifelse(var_prefix == "A_literacy", value, NA))
-  ) %>%
-  group_by(TEMP_id) %>%
-  mutate(
-    C_I_AgeBelow25 = ifelse(A_age < 25, 1, 0),
-    C_I_Age2535 = ifelse(A_age >= 25 & A_age < 35, 1, 0),
-    C_I_Age3545 = ifelse(A_age >= 35 & A_age < 45, 1, 0),
-    C_I_AgeAbove45 = ifelse(A_age >= 45 & !is.na(A_age), 1, 0),
-    C_I_Female = ifelse(gender == "f", 1, 0),
-    C_I_Literate = ifelse(A_literacy == 4, 1, 0),
-    C_I_EducNone = ifelse(A_educ == 0, 1, 0),
-    C_I_EducPrimary = ifelse(A_educ > 0 & A_educ <= 5, 1, 0),
-    C_I_EducLowerSec = ifelse(A_educ > 5 & A_educ <= 9, 1, 0),
-    C_I_EducUpperSec = ifelse(A_educ > 9 & A_educ <= 12, 1, 0),
-    C_I_EducTertiary = ifelse(A_educ > 12 & !is.na(A_educ), 1, 0),
-    C_I_Missing = as.integer(is.na(A_age) | is.na(A_educ) | is.na(A_literacy)),
-    C_H_bpl = ifelse(H_bpl == 1, 1, 0),
-    C_H_ownland = ifelse(H_ownland == 1, 1, 0),
-    C_H_hindu = ifelse(H_religion == 1, 1, 0),
-    C_H_CasteGen = ifelse(H_caste == 1 | H_caste == 5, 1, 0),
-    C_H_CasteOBC = ifelse(H_caste == 2 | H_caste == 6, 1, 0),
-    C_H_CasteSC = ifelse(H_caste == 3, 1, 0),
-    C_H_CasteST = ifelse(H_caste == 4, 1, 0),
-    C_H_Missing = as.integer(is.na(H_bpl) | is.na(H_ownland) | is.na(H_religion) | is.na(H_caste))
-  ) %>%
-  ungroup()
-
-# Afficher les premières lignes du jeu de données transformé
-head(merged_data_long)
-
-
-
-
-
-## passons à la suite; standardisation des variables
-
-# Liste des variables à standardiser
-vars_to_standardize <- c(
-  grep("^E_know_", colnames(merged_data_long), value = TRUE),
-  grep("^F_rate_", colnames(merged_data_long), value = TRUE),
-  grep("^E_rate", colnames(merged_data_long), value = TRUE)
-)
-
-# Standardisation des variables pour le sous-ensemble spécifié
-merged_data_long <- merged_data_long %>%
-  group_by(TEMP_id) %>%
-  mutate(
-    across(
-      all_of(vars_to_standardize),
-      ~ ifelse(
-        INT_treatment == 0 & RES05_gender == 0,
-        (`_` - mean(`_`[INT_treatment == 0 & RES05_gender == 0], na.rm = TRUE)) /
-          sd(`_`[INT_treatment == 0 & RES05_gender == 0], na.rm = TRUE),
-        `_`
-      )
-    )
-  ) %>%
-  ungroup()
-
-
-## jusqu'ici ça fonctionne
-
-
-# ce bloc non: 
-# Calcul des moyennes de lignes pour créer de nouvelles variables
-merged_data_long <- merged_data_long %>%
-  mutate(
-    E_know_nregarules = rowMeans(select(., E_know_minimumwage, E_know_maximumdays), na.rm = TRUE),
-    E_know_sarpanchrole = rowMeans(select(., starts_with("E_know_sarpanchrole_")), na.rm = TRUE),
-    E_rate_nrega = rowMeans(select(., E_rate_NREGAimplementation, E_rate_sarpanchperformance), na.rm = TRUE),
-    F_rate_publicgoods = rowMeans(select(., F_rate_publicgoods_road, F_rate_publicgoods_pump, F_rate_publicgoods_school), na.rm = TRUE)
-  )
-
-
-# tentatives de m'en sortir sinon je vais mourir
-
-print(colnames(merged_data_long))
-
-
-
-
-
-
-
-
-
-# controls
-
-# normalisation of variables
-
-
-
-## regression 1
-## regression 2
-## regression 3
-
-
-## Output file
-
-
-
-
-
-
-
-
-
-
-
+# gestion de la colinéarité
+library(glmnet)
+# Exemple de régression ridge
+x <- model.matrix(~ TEMP_index_E_know_nregarules + TEMP_X_res_index_E_know_nregarules +
+                    TEMP_X_anytr_index_E_know_nregarules + gpcontrols + indcontrols + hhcontrols,
+                  data = df_imputed)[, -1]
+y <- df_imputed$E_know_nregarules
+# Ajuster le modèle ridge
+ridge_model <- glmnet(x, y, alpha = 0, lambda = 0.01)
+# Afficher les coefficients
+coef(ridge_model)
 
 
