@@ -135,15 +135,37 @@ df_long <- df %>%
 
 
 
-# colnames to check
+# Après avoir utilisé pivot_longer pour transformer les données, supprimer la ligne bizarre non-genrée
+df_long <- df %>%
+  pivot_longer(
+    cols = c(
+      starts_with("A_age"), starts_with("A_educ"), starts_with("A_literacy"),
+      starts_with("D_NREGA_work"), starts_with("E_know"), starts_with("E_rate"),
+      starts_with("F_rank"), starts_with("F_rate_publicgoods"), starts_with("F_optimistic")
+    ),
+    names_to = c(".value", "gender"),
+    names_sep = "_(?=[mf]$)"
+  )
+
+# Filtrer pour ne garder que les lignes où gender est "m" ou "f"
+df_long <- df_long %>%
+  filter(gender %in% c("m", "f"))
+
+# Vérifiez les noms de colonnes
 print(colnames(df_long))
 
+# Renommer les colonnes si nécessaire
 df_long <- df_long %>%
   rename(
     A_age = A_age,
     A_educ = A_educ,
     A_literacy = A_literacy
   )
+
+
+
+
+
 
 # cleaning and interest variables
 df_reshaped <- df_long %>%
@@ -181,108 +203,142 @@ head(df_reshaped)
 
 
 
+## tentative de réplication du 24/06 je perds espoir
 
-## tentative régression 23 / 06
 
-# Standardiser les variables E_know_*, F_rate_*, E_rate* pour les individus de contrôle
-vars_to_scale <- df_reshaped %>%
-  select(starts_with("E_know_"), starts_with("F_rate_"), starts_with("E_rate")) %>%
-  select(where(is.numeric)) %>%
-  colnames()
+library(dplyr)
 
+# Normalisation des variables spécifiques
 df_reshaped <- df_reshaped %>%
-  mutate(across(all_of(vars_to_scale), ~ {
-    control_group <- df_reshaped %>%
-      filter(INT_treatment == 0, RES05_gender == 0) %>%
-      pull(cur_column())
-    mu <- mean(control_group, na.rm = TRUE)
-    sigma <- sd(control_group, na.rm = TRUE)
-    (. - mu) / sigma
-  }, .names = "{.col}"))
+  mutate(across(matches("^E_know_|^F_rate_|^E_rate_"),
+                ~ ifelse(INT_treatment == 0 & RES05_gender == 0,
+                         scale(.x)[,1],
+                         .x)))
 
-# Créer des variables composites
+
+
+# Création de nouvelles variables
+
 df_reshaped <- df_reshaped %>%
   mutate(
-    E_know_nregarules = rowMeans(select(., E_know_minimumwage, E_know_maximumdays), na.rm = TRUE),
+    E_know_nregarules = rowMeans(select(., starts_with("E_know_minimumwage"), E_know_maximumdays), na.rm = TRUE),
     E_know_sarpanchrole = rowMeans(select(., starts_with("E_know_sarpanchrole_")), na.rm = TRUE),
     E_rate_nrega = rowMeans(select(., E_rate_NREGAimplementation, E_rate_sarpanchperformance), na.rm = TRUE),
     F_rate_publicgoods = rowMeans(select(., F_rate_publicgoods_road, F_rate_publicgoods_pump, F_rate_publicgoods_school), na.rm = TRUE)
   )
 
-# Variables d'interaction
-indices <- c("E_know_nregarules", "E_know_sarpanchrole", "E_rate_nrega", "F_rate_publicgoods")
 
-for (index in indices) {
-  df_reshaped <- df_reshaped %>%
-    mutate(
-      !!paste0("TEMP_index_", index) := .data[[index]],
-      !!paste0("TEMP_X_res_index_", index) := RES05_gender * .data[[index]],
-      !!paste0("TEMP_X_anytr_index_", index) := INT_treatment * .data[[index]],
-      !!paste0("TEMP_X_grltr_index_", index) := INT_treatment_general * .data[[index]],
-      !!paste0("TEMP_X_gndtr_index_", index) := INT_treatment_gender * .data[[index]],
-      !!paste0("TEMP_X_anytr_res_index_", index) := INT_treatment * RES05_gender * .data[[index]],
-      !!paste0("TEMP_X_grltr_res_index_", index) := INT_treatment_general * RES05_gender * .data[[index]],
-      !!paste0("TEMP_X_gndtr_res_index_", index) := INT_treatment_gender * RES05_gender * .data[[index]]
-    )
-}
+
+## exécution des régressions
+
+# bibliothèques
+
+install.packages("lme4")
+install.packages("sandwich")
+install.packages("lmtest")
+library(lme4)
+library(sandwich)
+library(lmtest)
+
+
+# regression
 
 # Définir les variables de contrôle
 indcontrols <- grep("^C_I_", names(df_reshaped), value = TRUE)
 hhcontrols <- grep("^C_H_", names(df_reshaped), value = TRUE)
-gpcontrols <- grep("^std_HH_NREGA", names(df_reshaped), value = TRUE)
 
-# Exécuter les régressions et stocker les résultats
-results_list <- list()
-i <- 1
+# Vérifiez que toutes les variables dans gpcontrols existent dans df_reshaped
+gpcontrols <- gpcontrols[gpcontrols %in% names(df_reshaped)]
 
-for (dep_var in indices) {
+# Liste des variables dépendantes
+dep_vars <- c("E_know_nregarules", "E_know_sarpanchrole", "E_rate_nrega", "F_rate_publicgoods")
+
+# Boucle sur chaque variable dépendante
+for (dep_var in dep_vars) {
+  # Vérifiez que la variable dépendante existe dans df_reshaped
+  if (!dep_var %in% names(df_reshaped)) {
+    message(paste("Variable dépendante", dep_var, "non trouvée dans df_reshaped"))
+    next
+  }
+  
+  # Calculer les moyennes de contrôle
   control_mean1 <- mean(df_reshaped[[dep_var]][df_reshaped$INT_treatment == 0 & df_reshaped$RES05_gender == 0], na.rm = TRUE)
   control_mean2 <- mean(df_reshaped[[dep_var]][df_reshaped$INT_treatment == 0 & df_reshaped$RES05_gender == 1], na.rm = TRUE)
   
-  temp_index_var <- paste0("TEMP_index_", dep_var)
+  # Définir la formule de régression
+  formula <- as.formula(paste(dep_var, "~ TEMP_index +", paste(gpcontrols, indcontrols, hhcontrols, collapse = " + ")))
   
-  fmla_str <- paste(dep_var, "~", paste(c(temp_index_var, gpcontrols, indcontrols, hhcontrols), collapse = " + "))
-  formula <- as.formula(fmla_str)
+  # Exécuter le modèle
+  model <- lm(formula, data = df_reshaped)
   
-  model <- feols(formula, fixef = "district", cluster = "ID_gp_no", data = df_reshaped)
+  # Calculer les erreurs standard clusterisées
+  coeftest(model, vcov = vcovCL, cluster = ~ ID_gp_no)
   
-  results_list[[paste0("Model_", i)]] <- model
-  attr(results_list[[paste0("Model_", i)]], "control_mean1") <- control_mean1
-  attr(results_list[[paste0("Model_", i)]], "control_mean2") <- control_mean2
-  
-  i <- i + 1
+  # Afficher les résultats
+  print(summary(model))
+  print(paste("Mean in Control not WR in 2005:", control_mean1))
+  print(paste("Mean in Control WR in 2005:", control_mean2))
 }
 
-# Afficher les résultats des régressions
-modelsummary(results_list, output = "default", stars = TRUE, gof_map = c("nobs", "r.squared"))
+
+colnames(df_reshaped)
 
 
 
-## marche pas
-
-# Vérifiez les valeurs manquantes dans votre dataframe
-summary(df_reshaped)
+## je tente mais je crois que ça va échouer
 
 
+# Définir les variables de contrôle disponibles
+indcontrols <- grep("^C_I_", names(df_reshaped), value = TRUE)
+hhcontrols <- grep("^C_H_", names(df_reshaped), value = TRUE)
 
-# gestion des valeurs manquantes
-install.packages("mice")
-library(mice)
-# Imputation des valeurs manquantes
-imputed_data <- mice(df_reshaped, m = 1, method = "mean", maxit = 50, seed = 500)
-df_imputed <- complete(imputed_data)
+# Vérifiez que toutes les variables dans gpcontrols existent dans df_reshaped
+gpcontrols <- c("RES00_gender.y", "RES00_obc", "RES00_sc", "RES00_st",
+                "RES10_obc.y", "RES10_sc.y", "RES10_st.y", "RES05_obc.y",
+                "RES05_sc.y", "RES05_st.y")
+
+gpcontrols <- gpcontrols[gpcontrols %in% names(df_reshaped)]
+
+# Liste des variables dépendantes
+dep_vars <- c("E_know_nregarules", "E_know_sarpanchrole", "E_rate_nrega", "F_rate_publicgoods")
+
+# Boucle sur chaque variable dépendante
+for (dep_var in dep_vars) {
+  # Vérifiez que la variable dépendante existe dans df_reshaped
+  if (!(dep_var %in% names(df_reshaped))) {
+    message(paste("Variable dépendante", dep_var, "non trouvée dans df_reshaped"))
+    next
+  }
+  
+  # Calculer les moyennes de contrôle
+  control_mean1 <- mean(df_reshaped[[dep_var]][df_reshaped$INT_treatment == 0 & df_reshaped$RES05_gender == 0], na.rm = TRUE)
+  control_mean2 <- mean(df_reshaped[[dep_var]][df_reshaped$INT_treatment == 0 & df_reshaped$RES05_gender == 1], na.rm = TRUE)
+  
+  # Définir la formule de régression en utilisant reformulate
+  predictors <- c("TEMP_index", gpcontrols, indcontrols, hhcontrols)
+  formula <- reformulate(predictors, response = dep_var)
+  
+  # Exécuter le modèle
+  model <- lm(formula, data = df_reshaped)
+  
+  # Calculer les erreurs standard clusterisées
+  coeftest_result <- coeftest(model, vcov = vcovCL, cluster = ~ ID_gp_no)
+  
+  # Afficher les résultats
+  print(summary(model))
+  print(coeftest_result)
+  print(paste("Mean in Control not WR in 2005:", control_mean1))
+  print(paste("Mean in Control WR in 2005:", control_mean2))
+}
 
 
-# gestion de la colinéarité
-library(glmnet)
-# Exemple de régression ridge
-x <- model.matrix(~ TEMP_index_E_know_nregarules + TEMP_X_res_index_E_know_nregarules +
-                    TEMP_X_anytr_index_E_know_nregarules + gpcontrols + indcontrols + hhcontrols,
-                  data = df_imputed)[, -1]
-y <- df_imputed$E_know_nregarules
-# Ajuster le modèle ridge
-ridge_model <- glmnet(x, y, alpha = 0, lambda = 0.01)
-# Afficher les coefficients
-coef(ridge_model)
+
+
+
+
+
+
+
+
 
 
