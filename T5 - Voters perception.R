@@ -3,515 +3,371 @@
 
 ### LIBRARIES
 
-# Un-comment the packages installation if necessary
-install.packages("haven")
-install.packages("dplyr")
-install.packages("tidyverse")
-
-# Required libraries
-library(haven)
-library(dplyr)
-library(tidyverse)
+# Package installation if necessary
+# install.packages(c("tidyverse", "fixest", "modelsummary", "haven", "janitor"))
 
 
 
-### PATH
+## DATA
 
-path <- "~/work"
+path      <- file.path("~/work")
 
-### MACROS
-
-# Global variables for controls and output variables
-gpcontrols <- "GP_population GP_lit GP_sc GP_st GP_nbvillages RES00_gender RES00_obc RES00_sc RES00_st RES10_obc RES10_sc RES10_st RES05_obc RES05_sc RES05_st"
-gpcontrols15 <- paste(gpcontrols, "RES15_obc RES15_sc RES15_st")
-
-outregvar0 <- "RES05_gender_control X_anytr_nogenderres05 X_anytr_genderres05"
-outregvar1 <- "RES05_gender INT_treatment"
-outregvar2 <- "INT_treatment RES05_gender X_anytr_genderres05"
-outregvar3 <- "INT_treatment_gender INT_treatment_general RES05_gender"
-outregvar4 <- "INT_treatment_gender INT_treatment_general RES05_gender X_generaltr_genderres05 X_gendertr_genderres05"
-outregvar5 <- "INT_treatment RES05_gender X_anytr_genderres05 INC05_can_run X_anytr_inc_can X_inc_can_genderres05 X_anytr_inc_can_genderres05"
-
-# Variables for indices
-TEMP_index <- "TEMP_index"
-TEMP_X_res_index <- "TEMP_X_res_index"
-TEMP_X_anytr_index <- "TEMP_X_anytr_index"
-TEMP_X_anytr_res_index <- "TEMP_X_anytr_res_index"
-TEMP_X_gender_index <- "TEMP_X_gender_index"
-TEMP_X_general_index <- "TEMP_X_general_index"
-TEMP_X_gender_res_index <- "TEMP_X_gender_res_index"
-TEMP_X_general_res_index <- "TEMP_X_general_res_index"
-
-outregvarindex1 <- paste(TEMP_X_res_index, TEMP_X_anytr_index, outregvar1, TEMP_index)
-outregvarindex2 <- paste(TEMP_X_anytr_index, TEMP_X_anytr_res_index, TEMP_X_res_index, outregvar2, TEMP_index)
-outregvarindex3 <- paste(TEMP_X_gender_index, TEMP_X_general_index, TEMP_X_gender_res_index, TEMP_X_general_res_index, TEMP_X_res_index, outregvar4, TEMP_index)
-
-
-
-
-## version du code du 19/06 ####################
-
-
-# Paths
-electoral_data_path <- "~/work/Electoral data cleaned.dta"
-household_data_path <- "~/work/Household survey data cleaned.dta"
-
-# Load data
-electoral_data <- read_dta(electoral_data_path)
-
-# Variables to keep
-indices <- "index_empl_pre_svysample"
+# variables
 gpcontrols <- c("GP_population", "GP_lit", "GP_sc", "GP_st", "GP_nbvillages",
                 "RES00_gender", "RES00_obc", "RES00_sc", "RES00_st",
-                "RES10_obc", "RES10_sc", "RES10_st", "RES05_obc",
-                "RES05_sc", "RES05_st")
+                "RES10_obc", "RES10_sc", "RES10_st",
+                "RES05_obc", "RES05_sc", "RES05_st")
 
-# Filtering the data
-electoral_data_filtered <- electoral_data %>%
-  select(district, ps, gp, all_of(gpcontrols), all_of(indices), starts_with("std_HH_NREGA")) %>%
+## macros
+outregvar2      <- c("INT_treatment", "RES05_gender", "X_anytr_genderres05")
+outregvarindex2 <- c("TEMP_X_anytr_index", "TEMP_X_anytr_res_index",
+                     "TEMP_X_res_index",  outregvar2, "TEMP_index")
+
+indices <- "index_empl_pre_svysample"   
+
+## Loading and merging the data
+electoral <- read_dta(file.path("Electoral data cleaned.dta")) |>
+  select(district, ps, gp, all_of(gpcontrols),
+         all_of(indices), starts_with("std_HH_NREGA")) |>
   distinct()
 
-# Save filtered dataframe in a temporary file
-temp_file <- tempfile(fileext = ".dta")
-write_dta(electoral_data_filtered, temp_file)
+household <- read_dta(file.path("Household survey data cleaned.dta"))
 
-# Load household survey data
-household_data <- read_dta(household_data_path)
-
-# Merge with filtered electoral data
-merged_data <- household_data %>%
-  arrange(district, ps, gp) %>%
-  inner_join(read_dta(temp_file), by = c("district", "ps", "gp"))
+df <- household |>
+  left_join(electoral, by = c("district", "ps", "gp")) |>
+  filter(!is.na(index_empl_pre_svysample))               
 
 
+# deleting the duplicates when a .x or .y appeared during the merge
+dups <- names(df) %>% str_subset("\\.x$")
 
-
-# until now, pretty sure it's normal
-
-
-## reshape ##
-
-df <- merged_data %>%
-  select(
-    district, ps, gp, ID_gp_no,
-    starts_with("A_age"), starts_with("A_educ"), starts_with("A_literacy"),
-    starts_with("D_NREGA_work"), starts_with("E_know"), starts_with("E_rate"),
-    starts_with("F_rank"), starts_with("F_rate_publicgoods"), starts_with("F_optimistic"),
-    H_bpl, H_ownland, H_participates_nrega, H_religion, H_caste,
-    ELEC10_electorate_total, ELEC10_electorate_total_missing,
-    starts_with("RES00"), starts_with("RES10"), starts_with("RES05"),
-    starts_with("INT_"), starts_with("X_"), starts_with("index"),
-    starts_with("std_HH_NREGA")
-  ) %>%
-  mutate(TEMP_id = row_number())
-
-
-
-
-# temporary id
-df <- df %>%
-  mutate(TEMP_id = row_number())
-
-
-# VERSION CORRIGEE DE L'UTILISATION DE PIVOT ::
-# question of pivot
-df_long <- df %>%
-  pivot_longer(
-    cols = c(
-      starts_with("A_age"), starts_with("A_educ"), starts_with("A_literacy"),
-      starts_with("D_NREGA_work"), starts_with("E_know"), starts_with("E_rate"),
-      starts_with("F_rank"), starts_with("F_rate_publicgoods"), starts_with("F_optimistic")
-    ),
-    names_to = c(".value","gender"),
-    names_sep="_(?=[mf]$)"
-    
-      ) 
-# %>%
-#   separate(variable, into = c("prefix", "gender"), sep = "_(?=[mf]$)", fill = "right") %>%
-#   pivot_wider(
-#     names_from = prefix,
-#     values_from = value
-#   )
-
-
-
-# colnames to check
-print(colnames(df_long))
-
-df_long <- df_long %>%
-  rename(
-    A_age = A_age,
-    A_educ = A_educ,
-    A_literacy = A_literacy
-  )
-
-# cleaning and interest variables
-df_reshaped <- df_long %>%
-  mutate(
-    A_age = as.numeric(A_age),
-    A_educ = as.numeric(A_educ),
-    A_literacy = as.numeric(A_literacy),
-    A_age = ifelse(A_age == 0, NA, A_age),
-    C_I_AgeBelow25 = A_age < 25,
-    C_I_Age2535 = A_age >= 25 & A_age < 35,
-    C_I_Age3545 = A_age >= 35 & A_age < 45,
-    C_I_AgeAbove45 = A_age >= 45 & !is.na(A_age),
-    C_I_Female = gender == "f",
-    C_I_Literate = A_literacy == 4,
-    C_I_EducNone = A_educ == 0,
-    C_I_EducPrimary = A_educ > 0 & A_educ <= 5,
-    C_I_EducLowerSec = A_educ > 5 & A_educ <= 9,
-    C_I_EducUpperSec = A_educ > 9 & A_educ <= 12,
-    C_I_EducTertiary = A_educ > 12 & !is.na(A_educ),
-    C_I_Missing = is.na(A_age) | is.na(A_educ) | is.na(A_literacy),
-    C_H_bpl = H_bpl == 1,
-    C_H_ownland = H_ownland == 1,
-    C_H_hindu = H_religion == 1,
-    C_H_CasteGen = H_caste == 1 | H_caste == 5,
-    C_H_CasteOBC = H_caste == 2 | H_caste == 6,
-    C_H_CasteSC = H_caste == 3,
-    C_H_CasteST = H_caste == 4,
-    C_H_Missing = is.na(H_bpl) | is.na(H_ownland) | is.na(H_religion) | is.na(H_caste)
-  )
-
-# check
-head(df_reshaped)
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-## poubelle temporaire (au 23 juin)
-
-## controls ##
-
-library(dplyr)
-library(stringr)
-
-# Centrage et réduction des variables E_know_*, F_rate_*, E_rate* pour les individus de contrôle (INT_treatment==0 & RES05_gender==0)
-vars_to_scale <- df_reshaped %>%
-  select(starts_with("E_know_"), starts_with("F_rate_"), starts_with("E_rate")) %>%
-  select(where(is.numeric)) %>%
-  colnames()
-
-df_reshaped <- df_reshaped %>%
-  mutate(across(all_of(vars_to_scale), ~ {
-    control_group <- df_reshaped %>%
-      filter(INT_treatment == 0, RES05_gender == 0) %>%
-      pull(cur_column())
-    mu <- mean(control_group, na.rm = TRUE)
-    sigma <- sd(control_group, na.rm = TRUE)
-    (. - mu) / sigma
-  }, .names = "{.col}"))
-
-
-
-# composites
-df_reshaped <- df_reshaped %>%
-  mutate(
-    E_know_nregarules = rowMeans(select(., E_know_minimumwage, E_know_maximumdays), na.rm = TRUE),
-    E_know_sarpanchrole = rowMeans(select(., starts_with("E_know_sarpanchrole_")), na.rm = TRUE),
-    E_rate_nrega = rowMeans(select(., E_rate_NREGAimplementation, E_rate_sarpanchperformance), na.rm = TRUE),
-    F_rate_publicgoods = rowMeans(select(., F_rate_publicgoods_road, F_rate_publicgoods_pump, F_rate_publicgoods_school), na.rm = TRUE)
-  )
-
-
-# variables d'interaction
-
-indices <- c("E_know_nregarules", "E_know_sarpanchrole", "E_rate_nrega", "F_rate_publicgoods")
-
-for (index in indices) {
-  df_reshaped <- df_reshaped %>%
+for (vx in dups) {
+  base <- str_remove(vx, "\\.x$")
+  vy   <- paste0(base, ".y")
+  
+  df <- df %>%
     mutate(
-      !!paste0("TEMP_index_", index) := .data[[index]],
-      !!paste0("TEMP_X_res_index_", index) := RES05_gender * .data[[index]],
-      !!paste0("TEMP_X_anytr_index_", index) := INT_treatment * .data[[index]],
-      !!paste0("TEMP_X_grltr_index_", index) := INT_treatment_general * .data[[index]],
-      !!paste0("TEMP_X_gndtr_index_", index) := INT_treatment_gender * .data[[index]],
-      !!paste0("TEMP_X_anytr_res_index_", index) := INT_treatment * RES05_gender * .data[[index]],
-      !!paste0("TEMP_X_grltr_res_index_", index) := INT_treatment_general * RES05_gender * .data[[index]],
-      !!paste0("TEMP_X_gndtr_res_index_", index) := INT_treatment_gender * RES05_gender * .data[[index]]
-    )
-}
-
-
-
-## control variables
-
-install.packages("fixest")
-install.packages("modelsummary")
-library(dplyr)
-library(fixest)
-library(modelsummary)
-
-# Définir les variables de contrôle
-indcontrols <- grep("^C_I_", names(data), value = TRUE)
-hhcontrols  <- grep("^C_H_", names(data), value = TRUE)
-gpcontrols  <- grep("^std_HH_NREGA", names(data), value = TRUE)
-
-standardize_vars <- grep("^E_know_|^F_rate_|^E_rate", names(df_reshaped), value = TRUE)
-
-df_reshaped <- df_reshaped %>%
-  mutate(across(
-    all_of(standardize_vars),
-    ~ ifelse(INT_treatment == 0 & RES05_gender == 0, as.numeric(scale(.x)), .x)
-  ))
-
-
-
-
-
-
-
-
-# regressions
-
-results_list <- list()
-i <- 1
-
-for (dep_var in indices) {
-  # Moyennes dans le groupe de contrôle
-  control_mean1 <- mean(df_reshaped[[dep_var]][df_reshaped$INT_treatment == 0 & df_reshaped$RES05_gender == 0], na.rm = TRUE)
-  control_mean2 <- mean(df_reshaped[[dep_var]][df_reshaped$INT_treatment == 0 & df_reshaped$RES05_gender == 1], na.rm = TRUE)
-  
-  # Variable TEMP_index spécifique
-  temp_index_var <- paste0("TEMP_index_", dep_var)
-  
-  # Construire la formule classique (sans effets fixes)
-  rhs_vars <- c(temp_index_var, gpcontrols, indcontrols, hhcontrols)
-  fmla_str <- paste(dep_var, "~", paste(rhs_vars, collapse = " + "))
-  formula <- as.formula(fmla_str)
-  
-  # Faire la régression avec fixef en vecteur de noms de colonnes
-  model <- feols(formula, fixef = "district", cluster = "ID_gp_no", data = df_reshaped)
-  
-  # Stocker le résultat + moyennes contrôle
-  results_list[[paste0("Model_", i)]] <- model
-  attr(results_list[[paste0("Model_", i)]], "control_mean1") <- control_mean1
-  attr(results_list[[paste0("Model_", i)]], "control_mean2") <- control_mean2
-  
-  i <- i + 1
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-### poubelle
-
-
-
-# Utilisation du dataframe merged_data
-df <- merged_data
-
-# Sélection des variables disponibles
-df <- df %>%
-  select(
-    district, ps, gp, ID_gp_no,
-    starts_with("A_age"), starts_with("A_educ"), starts_with("A_literacy"),
-    starts_with("D_NREGA_work"), starts_with("E_know"), starts_with("E_rate"),
-    starts_with("F_rank"), starts_with("F_rate_publicgoods"), starts_with("F_optimistic"),
-    H_bpl, H_ownland, H_participates_nrega, H_religion, H_caste,
-    ELEC10_electorate_total, ELEC10_electorate_total_missing,
-    starts_with("RES00"), starts_with("RES10"), starts_with("RES05"),
-    starts_with("INT_"), starts_with("X_"), starts_with("index"),
-    starts_with("std_HH_NREGA")
-  )
-
-# Ajout d'un identifiant temporaire
-df <- df %>%
-  mutate(TEMP_id = row_number())
-
-# Remodelage des données
-df_reshaped <- df %>%
-  pivot_longer(
-    cols = c(
-      starts_with("A_age"), starts_with("A_educ"), starts_with("A_literacy"),
-      starts_with("D_NREGA_work"), starts_with("E_know"), starts_with("E_rate"),
-      starts_with("F_rank"), starts_with("F_rate_publicgoods"), starts_with("F_optimistic")
-    ),
-    names_to = "variable",
-    values_to = "value"
-  ) %>%
-  separate(variable, into = c("variable_prefix", "gender"), sep = "_", fill = "right") %>%
-  pivot_wider(
-    names_from = variable_prefix,
-    values_from = value
-  )
-
-
-## poubelle
-
-
-
-
-# Transformation des données de wide à long
-merged_data_long <- merged_data %>%
-  mutate(TEMP_id = row_number()) %>%
-  pivot_longer(
-    cols = c(
-      starts_with("A_age"), starts_with("A_educ"), starts_with("A_literacy"),
-      D_NREGA_work_m, D_NREGA_work_f, starts_with("E_know"),
-      starts_with("E_rate"), starts_with("F_rank"),
-      starts_with("F_rate_publicgoods"), starts_with("F_optimistic")
-    ),
-    names_to = c("var_prefix", "gender"),
-    values_to = "value",
-    names_pattern = "([^_]+)_([^_]+)"
-  ) %>%
-  mutate(
-    A_age = as.numeric(ifelse(var_prefix == "A_age", value, NA)),
-    A_educ = as.numeric(ifelse(var_prefix == "A_educ", value, NA)),
-    A_literacy = as.numeric(ifelse(var_prefix == "A_literacy", value, NA))
-  ) %>%
-  group_by(TEMP_id) %>%
-  mutate(
-    C_I_AgeBelow25 = ifelse(A_age < 25, 1, 0),
-    C_I_Age2535 = ifelse(A_age >= 25 & A_age < 35, 1, 0),
-    C_I_Age3545 = ifelse(A_age >= 35 & A_age < 45, 1, 0),
-    C_I_AgeAbove45 = ifelse(A_age >= 45 & !is.na(A_age), 1, 0),
-    C_I_Female = ifelse(gender == "f", 1, 0),
-    C_I_Literate = ifelse(A_literacy == 4, 1, 0),
-    C_I_EducNone = ifelse(A_educ == 0, 1, 0),
-    C_I_EducPrimary = ifelse(A_educ > 0 & A_educ <= 5, 1, 0),
-    C_I_EducLowerSec = ifelse(A_educ > 5 & A_educ <= 9, 1, 0),
-    C_I_EducUpperSec = ifelse(A_educ > 9 & A_educ <= 12, 1, 0),
-    C_I_EducTertiary = ifelse(A_educ > 12 & !is.na(A_educ), 1, 0),
-    C_I_Missing = as.integer(is.na(A_age) | is.na(A_educ) | is.na(A_literacy)),
-    C_H_bpl = ifelse(H_bpl == 1, 1, 0),
-    C_H_ownland = ifelse(H_ownland == 1, 1, 0),
-    C_H_hindu = ifelse(H_religion == 1, 1, 0),
-    C_H_CasteGen = ifelse(H_caste == 1 | H_caste == 5, 1, 0),
-    C_H_CasteOBC = ifelse(H_caste == 2 | H_caste == 6, 1, 0),
-    C_H_CasteSC = ifelse(H_caste == 3, 1, 0),
-    C_H_CasteST = ifelse(H_caste == 4, 1, 0),
-    C_H_Missing = as.integer(is.na(H_bpl) | is.na(H_ownland) | is.na(H_religion) | is.na(H_caste))
-  ) %>%
-  ungroup()
-
-# Afficher les premières lignes du jeu de données transformé
-head(merged_data_long)
-
-
-
-
-
-## passons à la suite; standardisation des variables
-
-# Liste des variables à standardiser
-vars_to_standardize <- c(
-  grep("^E_know_", colnames(merged_data_long), value = TRUE),
-  grep("^F_rate_", colnames(merged_data_long), value = TRUE),
-  grep("^E_rate", colnames(merged_data_long), value = TRUE)
-)
-
-# Standardisation des variables pour le sous-ensemble spécifié
-merged_data_long <- merged_data_long %>%
-  group_by(TEMP_id) %>%
-  mutate(
-    across(
-      all_of(vars_to_standardize),
-      ~ ifelse(
-        INT_treatment == 0 & RES05_gender == 0,
-        (`_` - mean(`_`[INT_treatment == 0 & RES05_gender == 0], na.rm = TRUE)) /
-          sd(`_`[INT_treatment == 0 & RES05_gender == 0], na.rm = TRUE),
-        `_`
+      !!base := coalesce(              
+        if (vx %in% names(df)) .data[[vx]] else NULL,
+        if (vy %in% names(df)) .data[[vy]] else NULL
       )
     )
-  ) %>%
-  ungroup()
+}
+
+## deleting all remaining .x or .y
+df <- df %>%
+  select(-matches("\\.(x|y)$"))
 
 
-## jusqu'ici ça fonctionne
 
 
-# ce bloc non: 
-# Calcul des moyennes de lignes pour créer de nouvelles variables
-merged_data_long <- merged_data_long %>%
-  mutate(
-    E_know_nregarules = rowMeans(select(., E_know_minimumwage, E_know_maximumdays), na.rm = TRUE),
-    E_know_sarpanchrole = rowMeans(select(., starts_with("E_know_sarpanchrole_")), na.rm = TRUE),
-    E_rate_nrega = rowMeans(select(., E_rate_NREGAimplementation, E_rate_sarpanchperformance), na.rm = TRUE),
-    F_rate_publicgoods = rowMeans(select(., F_rate_publicgoods_road, F_rate_publicgoods_pump, F_rate_publicgoods_school), na.rm = TRUE)
+
+# RESHAPING AT INDIVIDUAL LEVEL 
+
+# minding the suffix gender = "_m", "_f"
+long_vars <- c("A_age", "A_educ", "A_literacy",
+               "D_NREGA_work",
+               "E_know_minimumwage", "E_know_maximumdays",
+               "E_know_sarpanchrole_projects", "E_know_sarpanchrole_jobcard",
+               "E_know_sarpanchrole_work", "E_know_jobcardapplication",
+               "E_know_waitingdays", "E_know_unemploymentallowance",
+               "E_know_postofficepay",
+               "E_rate_NREGAimplementation", "E_rate_NREGAimplementation_g",
+               "E_rate_NREGAimplementation_vg", "E_rate_sarpanchperformance",
+               "E_rate_sarpanchperformance_g", "E_rate_sarpanchperformance_vg",
+               "F_rank_publicgoods_road", "F_rank_publicgoods_pump",
+               "F_rank_publicgoods_school",
+               "F_rate_publicgoods_road", "F_rate_publicgoods_pump",
+               "F_rate_publicgoods_school",
+               "F_optimistic_sarpanch", "F_optimistic_govprograms")
+
+# seeing what already exists without gender
+base_dups <- long_vars[ long_vars %in% names(df) ]   # ex. "D_NREGA_work"
+df <- df %>% select(-all_of(base_dups))
+
+# pivot
+df_long <- df %>%
+  mutate(TEMP_id = row_number()) %>%
+  pivot_longer(
+    cols         = matches(paste0("^(", paste(long_vars, collapse = "|"), ")_(m|f)$")),
+    names_to     = c(".value", "gender"),
+    names_pattern = "^(.*)_(m|f)$"
   )
 
 
-# tentatives de m'en sortir sinon je vais mourir
-
-print(colnames(merged_data_long))
 
 
+# INDICES FOR INDVIDIUAL
+
+df_long <- df_long |>
+  mutate(across(A_age, ~ na_if(., 0))) %>%           # 0 becomes NA
+  mutate(
+    C_I_AgeBelow25   = A_age  < 25,
+    C_I_Age2535      = between(A_age, 25, 34),
+    C_I_Age3545      = between(A_age, 35, 44),
+    C_I_AgeAbove45   = A_age  >= 45 & !is.na(A_age),
+    C_I_Female       = gender == "f",
+    C_I_Literate     = A_literacy == 4,
+    C_I_EducNone     = A_educ == 0,
+    C_I_EducPrimary  = A_educ  > 0 & A_educ <= 5,
+    C_I_EducLowerSec = A_educ  > 5 & A_educ <= 9,
+    C_I_EducUpperSec = A_educ  > 9 & A_educ <= 12,
+    C_I_EducTertiary = A_educ  > 12 & !is.na(A_educ),
+    C_I_Missing      = if_any(c(A_age, A_educ, A_literacy), is.na)
+  ) |>
+  mutate(
+    C_H_bpl       = H_bpl      == 1,
+    C_H_ownland   = H_ownland  == 1,
+    C_H_hindu     = H_religion == 1,
+    C_H_CasteGen  = H_caste %in% c(1, 5),
+    C_H_CasteOBC  = H_caste %in% c(2, 6),
+    C_H_CasteSC   = H_caste == 3,
+    C_H_CasteST   = H_caste == 4,
+    C_H_Missing   = if_any(c(H_bpl, H_ownland, H_religion, H_caste), is.na)
+  )
+
+indcontrols <- grep("^C_I_", names(df_long), value = TRUE)
+hhcontrols  <- grep("^C_H_", names(df_long), value = TRUE)
 
 
 
+# to avoid na errors
+dummy_vars <- c(indcontrols, hhcontrols)   # dummies
+df_long <- df_long %>%
+  mutate(across(all_of(dummy_vars),
+                ~ as.numeric(replace_na(., 0))))   
 
 
 
+# NORMALISING THE VARIABLES
 
-# controls
+to_z   <- grep("^(E_know_|F_rate_|E_rate)", names(df_long), value = TRUE)
 
-# normalisation of variables
+ref_mu <- df_long |>
+  filter(INT_treatment == 0, RES05_gender == 0) |>
+  summarise(across(all_of(to_z), mean,  na.rm = TRUE))
+ref_sd <- df_long |>
+  filter(INT_treatment == 0, RES05_gender == 0) |>
+  summarise(across(all_of(to_z), sd, na.rm = TRUE))
 
-
-
-## regression 1
-## regression 2
-## regression 3
-
-
-## Output file
-
-
-
+df_long[to_z] <- map2_dfc(df_long[to_z], names(df_long[to_z]), \(x, v)
+                          (x - ref_mu[[v]]) / ref_sd[[v]]
+)
 
 
 
+# COMPOSITE INDICES
+
+df_long <- df_long %>% 
+  mutate(
+    E_know_nregarules  = rowMeans(cbind(E_know_minimumwage,
+                                        E_know_maximumdays), na.rm = TRUE),
+    
+
+    E_know_sarpanchrole = rowMeans(pick(starts_with("E_know_sarpanchrole_")),
+                                   na.rm = TRUE),
+    E_rate_nrega        = rowMeans(cbind(E_rate_NREGAimplementation,
+                                         E_rate_sarpanchperformance),
+                                   na.rm = TRUE),
+    F_rate_publicgoods  = rowMeans(pick(starts_with("F_rate_publicgoods_")),
+                                   na.rm = TRUE)
+  )
+
+
+# INTERACTION VARIABLES
+
+df_long <- df_long |>
+  mutate(
+    TEMP_index              = !!sym(indices),
+    TEMP_X_res_index        = RES05_gender * TEMP_index,
+    TEMP_X_anytr_index      = INT_treatment * TEMP_index,
+    TEMP_X_anytr_res_index  = INT_treatment * RES05_gender * TEMP_index
+  )
 
 
 
+# REGRESSIONS
+
+dep_set1 <- c("E_know_nregarules", "E_know_sarpanchrole",
+              "E_rate_nrega", "F_rate_publicgoods")
+
+##  Reg 1  – TEMP_index
+models1 <- map(dep_set1, \(y) {
+  feols(
+    reformulate(c("TEMP_index", gpcontrols, indcontrols, hhcontrols),
+                response = y),
+    data    = df_long,
+    cluster = "ID_gp_no",   
+    fixef   = "district"   
+  )
+})
+
+names(models1) <- paste0("(", seq_along(models1), ") Reg1: ", dep_set1)
+
+##  Reg 2  – INT_treatment + RES05_gender + interaction
+dep_set2 <- c(indices, dep_set1)   
+models2 <- map(dep_set2, \(y) {
+  feols(
+    reformulate(c(outregvar2, gpcontrols, indcontrols, hhcontrols),
+                response = y),
+    data    = df_long,
+    cluster = "ID_gp_no",
+    fixef   = "district")
+})
+names(models2) <- paste0("(", seq_along(models2), ") Reg2: ", dep_set2)
+
+##  Reg 3  – index, complete
+models3 <- map(dep_set1, \(y) {
+  feols(
+    reformulate(c(outregvarindex2, gpcontrols, indcontrols, hhcontrols),
+                response = y),
+    data    = df_long,
+    cluster = "ID_gp_no",
+    fixef   = "district")
+})
+names(models3) <- paste0("(", seq_along(models3), ") Reg3: ", dep_set1)
+
+
+# adding the means
+
+control_means <- function(v) {
+  m1 <- mean(df_long[df_long$INT_treatment == 0 &
+                       df_long$RES05_gender == 0, v], na.rm = TRUE)
+  m2 <- mean(df_long[df_long$INT_treatment == 0 &
+                       df_long$RES05_gender == 1, v], na.rm = TRUE)
+  c(`Mean Control not WR 05` = m1,
+    `Mean Control WR 05`     = m2)
+}
+
+
+## one list per model
+gof_add1 <- imap(models1, \(m, n) control_means(dep_set1[as.numeric(str_extract(n, "\\d+"))]))
+gof_add2 <- imap(models2, \(m, n) {
+  var <- dep_set2[as.numeric(str_extract(n, "\\d+"))]
+  control_means(var)
+})
+gof_add3 <- imap(models3, \(m, n) control_means(dep_set1[as.numeric(str_extract(n, "\\d+"))]))
+
+
+#  mean in control rows
+row_add <- rbind(
+  map_dbl(c(gof_add1, gof_add2, gof_add3), 1),   # 1re ligne
+  map_dbl(c(gof_add1, gof_add2, gof_add3), 2)    # 2e ligne
+)
+rownames(row_add) <- c("Mean in Control not WR in 2005",
+                       "Mean in Control WR in 2005")
 
 
 
+## OUTPUT TABLE
+
+
+# listing the models
+mods <- c(models1, models2, models3)
+
+# variables to display
+vars <- c(
+  TEMP_index              = "STD Index (2005)",
+  INT_treatment           = "Any treat.",
+  RES05_gender            = "Female",
+  X_anytr_genderres05     = "Any × Female",
+  TEMP_X_anytr_index      = "Any × Index",
+  TEMP_X_anytr_res_index  = "Any × Index × F",
+  TEMP_X_res_index        = "Index × Female"
+)
+
+# mean control
+mean_control <- function(dep, female)
+  mean(df_long[[dep]][df_long$INT_treatment == 0 &
+                        df_long$RES05_gender  == female], na.rm = TRUE)
+
+# output file
+outfile <- "T5_Voters_complete.txt"
+sink(outfile)     
+
+for (i in seq_along(mods)) {
+  
+  m   <- mods[[i]]
+  dep <- all.vars(formula(m))[1]
+  
+  cat("\n================  MODEL", i, " — ", dep, "  ================\n")
+  
+  ct <- coeftable(m)
+  
+  for (v in names(vars)) {
+    if (v %in% rownames(ct)) {
+      cat(sprintf("%-25s %8.4f  (%7.4f)\n",
+                  vars[v], ct[v, "Estimate"], ct[v, "Std. Error"]))
+    }
+  }
+  
+  cat(sprintf("\nObservations                    %d", nobs(m)))
+  cat(sprintf("\nR-squared                       %.3f", fitstat(m, 'r2')))
+  cat("\nDistrict FE                     Yes")
+  cat("\nIndividual Controls             YES")
+  cat("\nHH Controls                     YES")
+  cat("\nGP controls                     Yes")
+  cat(sprintf("\nMean in Control not WR in 2005  %.4f",
+              mean_control(dep, 0)))
+  cat(sprintf("\nMean in Control WR in 2005      %.4f\n",
+              mean_control(dep, 1)))
+}
+
+sink()       
+
+
+
+# other presentation
+
+vars_keep <- c("TEMP_index",
+               "INT_treatment",
+               "RES05_gender",
+               "X_anytr_genderres05",
+               "TEMP_X_anytr_index",
+               "TEMP_X_anytr_res_index",
+               "TEMP_X_res_index")
+
+
+library(modelsummary)
+library(openxlsx)
+
+models_all <- c(models1, models2, models3)   
+
+coef_map <- c(
+  "TEMP_index"             = "STD Index (2005)",
+  "INT_treatment"          = "Any treat.",
+  "RES05_gender"           = "Female",
+  "X_anytr_genderres05"    = "Any × Female",
+  "TEMP_X_anytr_index"     = "Any × Index",
+  "TEMP_X_anytr_res_index" = "Any × Index × F",
+  "TEMP_X_res_index"       = "Index × Female"
+)
+
+tab5 <- msummary(
+  models_all,
+  coef_map   = coef_map,          
+  gof_omit   = "Adj|Within|Pseudo",
+  gof_map    = c("nobs" = "Observations",
+                 "FE: district" = "District FE"),
+  stars      = c('***' = .01, '**' = .05, '*' = .1),
+  output     = "data.frame"    
+)
+
+
+library(modelsummary)
+
+tab5_md <- msummary(
+  models_all,
+  coef_map = vars_keep,
+  gof_omit = "Adj|Within|Pseudo",
+  gof_map  = c("nobs" = "Observations",
+               "FE: district" = "District FE"),
+  stars    = c('***' = .01, '**' = .05, '*' = .1),
+  output   = "markdown"
+)
+
+tab5_txt <- as.character(tab5_md)
+
+outfile <- "T5_Voters.txt"
+writeLines(tab5_txt, con = outfile)
 
