@@ -324,6 +324,8 @@ cat("==== TRAITEMENT: COEFS ET SE ====\n")
 print(treat_table, row.names = FALSE)
 cat("\n\n")
 
+print(treat_table, n = Inf, width = Inf)
+
 # comparison of the two selected lists
 baseline_controls <- gpcontrols
 
