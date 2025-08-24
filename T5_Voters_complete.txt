@@ -1,0 +1,190 @@
+
+================  MODEL 1  —  E_know_nregarules   ================
+STD Index (2005)            0.0864  ( 0.0147)
+
+Observations                    9788
+R-squared                       0.078
+District FE                     Yes
+Individual Controls             YES
+HH Controls                     YES
+GP controls                     Yes
+Mean in Control not WR in 2005  -0.0000
+Mean in Control WR in 2005      -0.0028
+
+================  MODEL 2  —  E_know_sarpanchrole   ================
+STD Index (2005)           -0.0231  ( 0.0141)
+
+Observations                    9788
+R-squared                       0.109
+District FE                     Yes
+Individual Controls             YES
+HH Controls                     YES
+GP controls                     Yes
+Mean in Control not WR in 2005  -0.0000
+Mean in Control WR in 2005      0.0374
+
+================  MODEL 3  —  E_rate_nrega   ================
+STD Index (2005)            0.1284  ( 0.0223)
+
+Observations                    9783
+R-squared                       0.047
+District FE                     Yes
+Individual Controls             YES
+HH Controls                     YES
+GP controls                     Yes
+Mean in Control not WR in 2005  -0.0000
+Mean in Control WR in 2005      -0.0115
+
+================  MODEL 4  —  F_rate_publicgoods   ================
+STD Index (2005)            0.0212  ( 0.0230)
+
+Observations                    9770
+R-squared                       0.053
+District FE                     Yes
+Individual Controls             YES
+HH Controls                     YES
+GP controls                     Yes
+Mean in Control not WR in 2005  -0.0000
+Mean in Control WR in 2005      0.0216
+
+================  MODEL 5  —  index_empl_pre_svysample   ================
+Any treat.                 -0.0769  ( 0.1313)
+Female                     -0.2111  ( 0.1596)
+Any × Female               0.1366  ( 0.2172)
+
+Observations                    9788
+R-squared                       0.153
+District FE                     Yes
+Individual Controls             YES
+HH Controls                     YES
+GP controls                     Yes
+Mean in Control not WR in 2005  0.0880
+Mean in Control WR in 2005      -0.0979
+
+================  MODEL 6  —  E_know_nregarules   ================
+Any treat.                  0.0013  ( 0.0365)
+Female                      0.0189  ( 0.0421)
+Any × Female               0.0343  ( 0.0578)
+
+Observations                    9788
+R-squared                       0.071
+District FE                     Yes
+Individual Controls             YES
+HH Controls                     YES
+GP controls                     Yes
+Mean in Control not WR in 2005  -0.0000
+Mean in Control WR in 2005      -0.0028
+
+================  MODEL 7  —  E_know_sarpanchrole   ================
+Any treat.                  0.0245  ( 0.0327)
+Female                     -0.0243  ( 0.0421)
+Any × Female              -0.0203  ( 0.0601)
+
+Observations                    9788
+R-squared                       0.109
+District FE                     Yes
+Individual Controls             YES
+HH Controls                     YES
+GP controls                     Yes
+Mean in Control not WR in 2005  -0.0000
+Mean in Control WR in 2005      0.0374
+
+================  MODEL 8  —  E_rate_nrega   ================
+Any treat.                  0.0149  ( 0.0476)
+Female                     -0.0026  ( 0.0684)
+Any × Female              -0.0592  ( 0.0876)
+
+Observations                    9783
+R-squared                       0.035
+District FE                     Yes
+Individual Controls             YES
+HH Controls                     YES
+GP controls                     Yes
+Mean in Control not WR in 2005  -0.0000
+Mean in Control WR in 2005      -0.0115
+
+================  MODEL 9  —  F_rate_publicgoods   ================
+Any treat.                  0.0840  ( 0.0539)
+Female                     -0.0235  ( 0.0553)
+Any × Female              -0.0737  ( 0.0808)
+
+Observations                    9770
+R-squared                       0.055
+District FE                     Yes
+Individual Controls             YES
+HH Controls                     YES
+GP controls                     Yes
+Mean in Control not WR in 2005  -0.0000
+Mean in Control WR in 2005      0.0216
+
+================  MODEL 10  —  E_know_nregarules   ================
+STD Index (2005)            0.0716  ( 0.0217)
+Any treat.                  0.0074  ( 0.0344)
+Female                      0.0351  ( 0.0398)
+Any × Female               0.0230  ( 0.0538)
+Any × Index                0.0275  ( 0.0393)
+Any × Index × F           0.0105  ( 0.0678)
+Index × Female             0.0016  ( 0.0504)
+
+Observations                    9788
+R-squared                       0.079
+District FE                     Yes
+Individual Controls             YES
+HH Controls                     YES
+GP controls                     Yes
+Mean in Control not WR in 2005  -0.0000
+Mean in Control WR in 2005      -0.0028
+
+================  MODEL 11  —  E_know_sarpanchrole   ================
+STD Index (2005)           -0.0335  ( 0.0202)
+Any treat.                  0.0221  ( 0.0325)
+Female                     -0.0283  ( 0.0422)
+Any × Female              -0.0193  ( 0.0605)
+Any × Index                0.0040  ( 0.0350)
+Any × Index × F          -0.0215  ( 0.0658)
+Index × Female             0.0349  ( 0.0494)
+
+Observations                    9788
+R-squared                       0.110
+District FE                     Yes
+Individual Controls             YES
+HH Controls                     YES
+GP controls                     Yes
+Mean in Control not WR in 2005  -0.0000
+Mean in Control WR in 2005      0.0374
+
+================  MODEL 12  —  E_rate_nrega   ================
+STD Index (2005)            0.1484  ( 0.0329)
+Any treat.                  0.0243  ( 0.0450)
+Female                      0.0289  ( 0.0633)
+Any × Female              -0.0789  ( 0.0816)
+Any × Index               -0.0607  ( 0.0482)
+Any × Index × F           0.0204  ( 0.1073)
+Index × Female             0.0162  ( 0.0959)
+
+Observations                    9783
+R-squared                       0.048
+District FE                     Yes
+Individual Controls             YES
+HH Controls                     YES
+GP controls                     Yes
+Mean in Control not WR in 2005  -0.0000
+Mean in Control WR in 2005      -0.0115
+
+================  MODEL 13  —  F_rate_publicgoods   ================
+STD Index (2005)            0.0040  ( 0.0401)
+Any treat.                  0.0833  ( 0.0536)
+Female                     -0.0209  ( 0.0554)
+Any × Female              -0.0761  ( 0.0801)
+Any × Index               -0.0009  ( 0.0528)
+Any × Index × F           0.0639  ( 0.0791)
+Index × Female             0.0074  ( 0.0604)
+
+Observations                    9770
+R-squared                       0.056
+District FE                     Yes
+Individual Controls             YES
+HH Controls                     YES
+GP controls                     Yes
+Mean in Control not WR in 2005  -0.0000
+Mean in Control WR in 2005      0.0216
