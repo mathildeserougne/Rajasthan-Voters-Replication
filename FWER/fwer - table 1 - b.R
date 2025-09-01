@@ -1,6 +1,10 @@
 # tentative de nettoyage du fwer pour table 1, en enlevant le code pas utilisé
 
+# pas besoin de remettre les estimations de p values, c'est déjà fait dans la fonction pré codée
+# pas besoin d'affichage du panel B
+
 # Family-wise error rate method on Table 1
+
 # Install and load libraries
 #install.packages(c("tidyverse", "stargazer", "knitr", "broom", "haven", "fixest",
 #                   "modelsummary", "gt", "webshot2", "car", "multcomp"))
@@ -18,6 +22,8 @@ library(car)        # For FWER corrections
 library(multcomp)
 
 # Define control and dependent variables
+# Lists corresponding to the controls and dpdt variables in the replication
+
 gpcontrols <- c("GP_population", "GP_lit", "GP_sc", "GP_st", "GP_nbvillages",
                 "RES00_gender", "RES00_obc", "RES00_sc", "RES00_st",
                 "RES10_obc", "RES10_sc", "RES10_st", "RES05_obc", "RES05_sc", "RES05_st")
@@ -36,6 +42,7 @@ data_filtered <- data %>%
   )
 
 # Function to create regression formulas
+# linear regression formula, according to the model type (any or gender distinction)
 create_formula <- function(dep_var, model_type) {
   base_controls <- paste(gpcontrols, collapse = " + ")
   if (model_type == "any_treatment") {
@@ -47,6 +54,7 @@ create_formula <- function(dep_var, model_type) {
   }
   return(as.formula(formula_str))
 }
+
 
 # Function to extract p-values and apply FWER correction
 get_adjusted_pvalues <- function(models, var_names) {
@@ -83,6 +91,7 @@ for (i in 1:length(incum_dep_vars1)) {
   model <- lm(formula, data = data_filtered)
   models_list[[j]] <- model
 }
+
 
 # Define variables and panels for output
 outregvar2 <- c("INT_treatment", "INT_treatment_gender", "INT_treatment_general", "RES05_gender",
