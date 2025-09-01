@@ -4,6 +4,7 @@
 # nettoyages à faire sur EST-CE QUE LE CALCULATE-tests intervient dans la sortie finale??
 
 # Attempting the family-wise error rate method on Table 1
+
 install.packages(c("tidyverse", "stargazer", "knitr", "broom", "haven", "fixest",
                    "modelsummary", "gt", "webshot2", "car", "multcomp"))
 
@@ -57,50 +58,28 @@ create_formula <- function(dep_var, model_type) {
 
 # Function for the statistical tests
 # mais est-ce qu'elle intervient même dans la sortie finale???
-calculate_tests <- function(model, model_type) {
-  if (model_type == "any_treatment") {
-    test1 <- tryCatch({ car::linearHypothesis(model, "RES05_gender = 0") }, error = function(e) list(PrF = NA))
-    pval1 <- if (!is.null(test1$PrF)) round(test1$`Pr(>F)`[2], 2) else NA
-    test2 <- tryCatch({ car::linearHypothesis(model, "INT_treatment:RES05_gender = 0") }, error = function(e) list(PrF = NA))
-    pval2 <- if (!is.null(test2$PrF)) round(test2$`Pr(>F)`[2], 2) else NA
-    test3 <- tryCatch({ car::linearHypothesis(model, "INT_treatment = INT_treatment:RES05_gender") }, error = function(e) list(PrF = NA))
-    pval3 <- if (!is.null(test3$PrF)) round(test3$`Pr(>F)`[2], 2) else NA
-    return(list(pval1 = pval1, pval2 = pval2, pval3 = pval3))
-  } else if (model_type == "gender_general") {
-    test1 <- tryCatch({ car::linearHypothesis(model, "INT_treatment_gender:RES05_gender = 0") }, error = function(e) list(PrF = NA))
-    pval1 <- if (!is.null(test1$PrF)) round(test1$`Pr(>F)`[2], 2) else NA
-    test2 <- tryCatch({ car::linearHypothesis(model, "INT_treatment_general:RES05_gender = 0") }, error = function(e) list(PrF = NA))
-    pval2 <- if (!is.null(test2$PrF)) round(test2$`Pr(>F)`[2], 2) else NA
-    test3 <- tryCatch({ car::linearHypothesis(model, "INT_treatment_gender = INT_treatment_general") }, error = function(e) list(PrF = NA))
-    pval3 <- if (!is.null(test3$PrF)) round(test3$`Pr(>F)`[2], 2) else NA
-    test4 <- tryCatch({ car::linearHypothesis(model, "INT_treatment_gender:RES05_gender = INT_treatment_general:RES05_gender") }, error = function(e) list(PrF = NA))
-    pval4 <- if (!is.null(test4$PrF)) round(test4$`Pr(>F)`[2], 2) else NA
-    return(list(pval1 = pval1, pval2 = pval2, pval3 = pval3, pval4 = pval4))
-  }
-}
+#calculate_tests <- function(model, model_type) {
+#  if (model_type == "any_treatment") {
+#    test1 <- tryCatch({ car::linearHypothesis(model, "RES05_gender = 0") }, error = function(e) list(PrF = NA))
+#    pval1 <- if (!is.null(test1$PrF)) round(test1$`Pr(>F)`[2], 2) else NA
+#    test2 <- tryCatch({ car::linearHypothesis(model, "INT_treatment:RES05_gender = 0") }, error = function(e) list(PrF = NA))
+#    pval2 <- if (!is.null(test2$PrF)) round(test2$`Pr(>F)`[2], 2) else NA
+#    test3 <- tryCatch({ car::linearHypothesis(model, "INT_treatment = INT_treatment:RES05_gender") }, error = function(e) list(PrF = NA))
+#    pval3 <- if (!is.null(test3$PrF)) round(test3$`Pr(>F)`[2], 2) else NA
+#    return(list(pval1 = pval1, pval2 = pval2, pval3 = pval3))
+#  } else if (model_type == "gender_general") {
+#    test1 <- tryCatch({ car::linearHypothesis(model, "INT_treatment_gender:RES05_gender = 0") }, error = function(e) list(PrF = NA))
+#    pval1 <- if (!is.null(test1$PrF)) round(test1$`Pr(>F)`[2], 2) else NA
+#    test2 <- tryCatch({ car::linearHypothesis(model, "INT_treatment_general:RES05_gender = 0") }, error = function(e) list(PrF = NA))
+#    pval2 <- if (!is.null(test2$PrF)) round(test2$`Pr(>F)`[2], 2) else NA
+#    test3 <- tryCatch({ car::linearHypothesis(model, "INT_treatment_gender = INT_treatment_general") }, error = function(e) list(PrF = NA))
+#    pval3 <- if (!is.null(test3$PrF)) round(test3$`Pr(>F)`[2], 2) else NA
+#    test4 <- tryCatch({ car::linearHypothesis(model, "INT_treatment_gender:RES05_gender = INT_treatment_general:RES05_gender") }, error = function(e) list(PrF = NA))
+#    pval4 <- if (!is.null(test4$PrF)) round(test4$`Pr(>F)`[2], 2) else NA
+#    return(list(pval1 = pval1, pval2 = pval2, pval3 = pval3, pval4 = pval4))
+#  }
+#}
 
-# alternative
-calculate_tests_b <- function(model, model_type) {
-  if (model_type == "any_treatment") {
-    test1 <- tryCatch({ car::linearHypothesis(model, "RES05_gender = 0") }, error = function(e) list(PrF = NA))
-    pval1 <- if (!is.null(test1$PrF)) round(test1$`Pr(>F)`[2], 2) else NA
-    test2 <- tryCatch({ car::linearHypothesis(model, "INT_treatment:RES05_gender = 0") }, error = function(e) list(PrF = NA))
-    pval2 <- if (!is.null(test2$PrF)) round(test2$`Pr(>F)`[2], 2) else NA
-    test3 <- tryCatch({ car::linearHypothesis(model, "INT_treatment = INT_treatment:RES05_gender") }, error = function(e) list(PrF = NA))
-    pval3 <- if (!is.null(test3$PrF)) round(test3$`Pr(>F)`[2], 2) else NA
-    return(list(pval1 = pval1, pval2 = pval2, pval3 = pval3))
-  } else if (model_type == "gender_general") {
-    test1 <- tryCatch({ car::linearHypothesis(model, "INT_treatment_gender:RES05_gender = 0") }, error = function(e) list(PrF = NA))
-    pval1 <- if (!is.null(test1$PrF)) round(test1$`Pr(>F)`[2], 2) else NA
-    test2 <- tryCatch({ car::linearHypothesis(model, "INT_treatment_general:RES05_gender = 0") }, error = function(e) list(PrF = NA))
-    pval2 <- if (!is.null(test2$PrF)) round(test2$`Pr(>F)`[2], 2) else NA
-    test3 <- tryCatch({ car::linearHypothesis(model, "INT_treatment_gender = INT_treatment_general") }, error = function(e) list(PrF = NA))
-    pval3 <- if (!is.null(test3$PrF)) round(test3$`Pr(>F)`[2], 2) else NA
-    test4 <- tryCatch({ car::linearHypothesis(model, "INT_treatment_gender:RES05_gender = INT_treatment_general:RES05_gender") }, error = function(e) list(PrF = NA))
-    pval4 <- if (!is.null(test4$PrF)) round(test4$`Pr(>F)`[2], 2) else NA
-    return(list(pval1 = pval1, pval2 = pval2, pval3 = pval3, pval4 = pval4))
-  }
-}
 
 # Function to extract p-values and apply FWER correction
 get_adjusted_pvalues <- function(models, var_names) {
