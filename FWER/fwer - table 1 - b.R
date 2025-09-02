@@ -122,6 +122,9 @@ get_pvals_by_var <- function(pvalues_df, var_names, n_models) {
 pvals_A_by_var <- get_pvals_by_var(pvalues_panel_A, panel_A_vars, length(panel_A_models))
 pvals_B_by_var <- get_pvals_by_var(pvalues_panel_B, panel_B_vars, length(panel_B_models))
 
+
+
+
 # Print results to console
 print_panel_results <- function(models, var_names, pvalues_by_var, panel_name) {
   cat("\n\n======================================================================\n")
