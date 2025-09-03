@@ -234,3 +234,163 @@ print_selected_results(models_list, outregvar2_C, pvals_C_by_var_selected,
                        "Panel C: With Previous Gender Reservation (RES05_gender == 1)",
                        control_means, dep_vars, selected_models_C)
 
+
+
+
+
+#### .tex output ####
+
+
+# output path
+output_path <- "~/work/FWER_table4.tex"
+
+# variables' labels to avoid compilation issues
+var_labels <- c(
+  "INT_treatment" = "Treatment",
+  "RES05_gender" = "Reserved for Women (2005)",
+  "X_anytr_genderres05" = "Treatment$\\times$Reserved for Women (2005)"
+)
+
+# Function to extract results from a model
+extract_panel_results <- function(models, var_names, pvals_by_var, dep_vars, selected_models, control_means) {
+  panel_results <- list()
+  for (i in 1:length(selected_models)) {
+    model_index <- selected_models[i]
+    model <- models[[model_index]]
+    if (!is.null(model)) {
+      coef_table <- summary(model)$coefficients
+      dep_var_name <- dep_vars[i]
+      
+      # extract coeffs
+      coefs <- data.frame(
+        Variable = rownames(coef_table),
+        Coeff = coef_table[, "Estimate"],
+        SE = coef_table[, "Std. Error"],
+        P = coef_table[, "Pr(>|t|)"]
+      )
+      
+      # add adjusted p-values
+      for (var in var_names) {
+        if (var %in% rownames(coef_table)) {
+          idx <- which(var_names == var)
+          coefs$FWER[coefs$Variable == var] <- pvals_by_var[[var]][i]
+        }
+      }
+      
+      # filter for interest variables
+      coefs <- coefs[coefs$Variable %in% var_names, ]
+      
+      # replace variable names
+      coefs$Variable <- var_labels[match(coefs$Variable, names(var_labels))]
+      
+      # name of variable without underscore (compilation issue)
+      dep_var_label <- gsub("_", " ", dep_var_name)
+      
+      panel_results[[i]] <- list(
+        dep_var = dep_var_label,
+        coefs = coefs,
+        control_mean = control_means[model_index],
+        observations = nobs(model)
+      )
+    }
+  }
+  return(panel_results)
+}
+
+# Extracting the results for each panel
+panel_A_results <- extract_panel_results(
+  models_list, outregvar2, pvals_A_by_var_selected,
+  dep_vars, selected_models_A, control_means
+)
+
+panel_B_results <- extract_panel_results(
+  models_list, outregvar2_B, pvals_B_by_var_selected,
+  dep_vars, selected_models_B, control_means
+)
+
+panel_C_results <- extract_panel_results(
+  models_list, outregvar2_C, pvals_C_by_var_selected,
+  dep_vars, selected_models_C, control_means
+)
+
+
+# Beginning of the .tex script
+file <- file(output_path, open = "wt")
+cat(
+  c(
+    "\\documentclass[a4paper, 12pt]{article}",
+    "\\usepackage[margin=2cm]{geometry}",
+    "\\usepackage{booktabs}",
+    "\\usepackage[utf8]{inputenc}",
+    "\\usepackage{amsmath}",
+    "\\usepackage{pdflscape}",
+    "\\usepackage{graphicx}",
+    "\\usepackage{longtable}",
+    "\\begin{document}",
+    "\\begin{landscape}"
+  ),
+  file = file, sep = "\n"
+)
+close(file)
+
+# Function to write a panel in the .tex
+write_panel_to_tex <- function(file_path, panel_name, panel_results) {
+  file <- file(file_path, open = "at")
+  
+  cat("\\begin{longtable}{lccc}\n", file = file)
+  cat("\\caption{" , panel_name, "} \\\\ \n", file = file)
+  cat("\\label{tab:", gsub("[^a-zA-Z0-9]", "", tolower(panel_name)), "} \\\\ \n", file = file)
+  cat("\\toprule\n", file = file)
+  cat("\\multicolumn{4}{c}{", panel_name, "} \\\\ \n", file = file)
+  cat("\\midrule\n", file = file)
+  cat("\\endfirsthead\n", file = file)
+  cat("\\toprule\n", file = file)
+  cat("\\multicolumn{4}{c}{", panel_name, "} \\\\ \n", file = file)
+  cat("\\midrule\n", file = file)
+  cat("\\endhead\n", file = file)
+  
+  for (result in panel_results) {
+    cat("\\multicolumn{4}{l}{", result$dep_var, "} \\\\ \n", file = file)
+    cat("\\midrule\n", file = file)
+    cat("Variable & Coefficient (Std. Error) & p-value & FWER-adj p \\\\ \n", file = file)
+    
+    for (i in 1:nrow(result$coefs)) {
+      var_name <- result$coefs$Variable[i]
+      coef_val <- round(result$coefs$Coeff[i], 4)
+      se_val <- round(result$coefs$SE[i], 4)
+      p_val <- round(result$coefs$P[i], 4)
+      fwer_p <- round(result$coefs$FWER[i], 4)
+      
+      # add stars if wanted
+      stars <- ifelse(fwer_p < 0.01, "$^{***}$",
+                      ifelse(fwer_p < 0.05, "$^{**}$",
+                             ifelse(fwer_p < 0.1, "$^{*}$", "")))
+      
+      cat(var_name, " & ", coef_val, " (", se_val, ")", stars, " & ", p_val, " & ", fwer_p, " \\\\ \n", file = file)
+    }
+    cat("\\midrule\n", file = file)
+    cat("Control Mean: ", result$control_mean, " & & & \\\\ \n", file = file)
+    cat("Observations: ", result$observations, " & & & \\\\ \n", file = file)
+  }
+  cat("\\bottomrule\n", file = file)
+  cat("\\end{longtable}\n", file = file)
+  
+  close(file)
+}
+
+# Write each panel
+write_panel_to_tex(output_path, "Panel A: Full Sample", panel_A_results)
+write_panel_to_tex(output_path, "Panel B: Without Previous Gender Reservation (RES05\\_gender == 0)", panel_B_results)
+write_panel_to_tex(output_path, "Panel C: With Previous Gender Reservation (RES05\\_gender == 1)", panel_C_results)
+
+# Close the script
+file <- file(output_path, open = "at")
+cat(
+  c(
+    "\\end{landscape}",
+    "\\end{document}"
+  ),
+  file = file, sep = "\n"
+)
+close(file)
+
