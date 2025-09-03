@@ -153,7 +153,7 @@ print_selected_results <- function(models, var_names, pvalues_by_var, panel_name
       dep_var_name <- incum_dep_vars1[(model_index-1) %% length(incum_dep_vars1) + 1]
       index_name <- indices[(model_index-1) %/% length(incum_dep_vars1) + 1]
       
-      cat("--- Model ", selected_models[i], ": ", dep_var_name, " (Index: ", index_name, ") ---\n", sep = "")
+      cat("--- Model ", selected_models[i], ": ", "", " (Index: ", index_name, ") ---\n", sep = "")
       cat("Variable                     | Coeff (Std. Error) | p-value | FWER-adj p\n")
       cat("-----------------------------|--------------------|---------|------------\n")
       
