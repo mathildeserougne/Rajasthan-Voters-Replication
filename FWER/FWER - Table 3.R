@@ -235,3 +235,150 @@ print_selected_results(models_list, outregvar2, pvals_B_by_var_selected,
 print_selected_results(models_list, outregvar2, pvals_C_by_var_selected,
                        "SELECTED MODELS: With Previous Gender Reservation (RES05_gender == 1)",
                        control_means, dep_vars, selected_models_C)
+
+
+
+
+
+#### .tex output ####
+
+# Chemin de sortie
+output_path <- "~/work/FWER_table3.tex"
+
+# Dictionnaire pour les labels des variables (sans caractères spéciaux problématiques)
+var_labels <- c(
+  "INT_treatment" = "Treatment",
+  "RES05_gender" = "Reserved for Women (2005)",
+  "X_anytr_genderres05" = "Treatment{\\texttimes}Reserved for Women (2005)",
+  "ELEC10_nbcands" = "Number of Candidates (2010)",
+  "CHAL_nbchal" = "Number of Challengers",
+  "CHAL_prop_female" = "Proportion of Female Challengers",
+  "CHAL_voteshare_female" = "Vote Share of Female Challengers",
+  "CHAL_prop_nongen" = "Proportion of Non{_}General Challengers",
+  "CHAL_voteshare_nongen" = "Vote Share of Non{_}General Challengers"
+)
+
+# Fonction pour extraire les résultats
+extract_panel_results <- function(models, var_names, pvals_by_var, dep_vars, selected_models, control_means) {
+  panel_results <- list()
+  for (i in 1:length(selected_models)) {
+    model_index <- selected_models[i]
+    model <- models[[model_index]]
+    if (!is.null(model)) {
+      coef_table <- summary(model)$coefficients
+      dep_var_name <- dep_vars[(model_index-1) %% length(dep_vars) + 1]
+      
+      coefs <- data.frame(
+        Variable = rownames(coef_table),
+        Coeff = coef_table[, "Estimate"],
+        SE = coef_table[, "Std. Error"],
+        P = coef_table[, "Pr(>|t|)"]
+      )
+      
+      for (var in var_names) {
+        if (var %in% rownames(coef_table)) {
+          idx <- which(var_names == var)
+          coefs$FWER[coefs$Variable == var] <- pvals_by_var[[var]][i]
+        }
+      }
+      
+      coefs <- coefs[coefs$Variable %in% var_names, ]
+      coefs$Variable <- var_labels[match(coefs$Variable, names(var_labels))]
+      
+      panel_results[[i]] <- list(
+        dep_var = dep_vars[(model_index-1) %% length(dep_vars) + 1],
+        coefs = coefs,
+        control_mean = control_means[model_index],
+        observations = nobs(model)
+      )
+    }
+  }
+  return(panel_results)
+}
+
+# Extraction des résultats pour chaque panel
+panel_A_results <- extract_panel_results(
+  models_list, outregvar2, pvals_A_by_var_selected,
+  dep_vars, selected_models_A, control_means
+)
+
+panel_B_results <- extract_panel_results(
+  models_list, c("INT_treatment"), pvals_B_by_var_selected,
+  dep_vars, selected_models_B, control_means
+)
+
+panel_C_results <- extract_panel_results(
+  models_list, c("INT_treatment"), pvals_C_by_var_selected,
+  dep_vars, selected_models_C, control_means
+)
+
+# Fonction pour écrire les résultats en LaTeX
+write_panel_to_tex <- function(file_path, panel_name, panel_results) {
+  file <- file(file_path, open = "at")
+  
+  cat("\\begin{landscaped}\n", file = file)
+  cat("\\begin{table}[htbp]\n", file = file)
+  cat("\\centering\n", file = file)
+  cat("\\caption{" , panel_name, "}\n", file = file)
+  cat("\\label{tab:", gsub("[^a-zA-Z0-9]", "", tolower(panel_name)), "}\n", file = file)
+  cat("\\resizebox{\\textwidth}{!}{\n", file = file)
+  cat("\\begin{tabular}{lccc}\n", file = file)
+  cat("\\toprule\n", file = file)
+  cat("\\multicolumn{4}{c}{", panel_name, "} \\\\\n", file = file)
+  cat("\\midrule\n", file = file)
+  
+  for (result in panel_results) {
+    cat("\\multicolumn{4}{l}{--- ", result$dep_var, " ---} \\\\\n", file = file)
+    cat("\\cmidrule(lr){1-4}\n", file = file)
+    cat("Variable & Coeff (Std. Error) & p-value & FWER-adj p \\\\\n", file = file)
+    cat("\\midrule\n", file = file)
+    
+    for (i in 1:nrow(result$coefs)) {
+      var_name <- result$coefs$Variable[i]
+      coef_val <- round(result$coefs$Coeff[i], 4)
+      se_val <- round(result$coefs$SE[i], 4)
+      p_val <- round(result$coefs$P[i], 4)
+      fwer_p <- round(result$coefs$FWER[i], 4)
+      
+      cat(var_name, " & ", coef_val, " (", se_val, ") & ", p_val, " & ", fwer_p, " \\\\\n", file = file)
+    }
+    cat("\\bottomrule\n", file = file)
+    cat("Control Mean: ", result$control_mean, " & & & \\\\\n", file = file)
+    cat("Observations: ", result$observations, " & & & \\\\\n", file = file)
+  }
+  cat("\\end{tabular}\n", file = file)
+  cat("}\n", file = file)  # Fermeture du resizebox
+  cat("\\end{table}\n", file = file)
+  cat("\\end{landscaped}\n\n", file = file)
+  
+  close(file)
+}
+
+# Écrire l'en-tête LaTeX complet
+file <- file(output_path, open = "wt")
+cat(
+  c(
+    "\\documentclass{article}",
+    "\\usepackage{booktabs}",
+    "\\usepackage[utf8]{inputenc}",
+    "\\usepackage{amsmath}",
+    "\\usepackage{textcomp}",  # Pour \\texttimes
+    "\\usepackage{lscape}",    # Pour le mode paysage
+    "\\usepackage{graphicx}",  # Pour resizebox
+    "\\begin{document}"
+  ),
+  file = file, sep = "\n"
+)
+close(file)
+
+# Écrire chaque panel avec des noms de panel sans caractères spéciaux
+write_panel_to_tex(output_path, "Panel A Full Sample", panel_A_results)
+write_panel_to_tex(output_path, "Panel B Without Previous Gender Reservation RES05gender0", panel_B_results)
+write_panel_to_tex(output_path, "Panel C With Previous Gender Reservation RES05gender1", panel_C_results)
+
+# Fermer le fichier LaTeX
+file <- file(output_path, open = "at")
+cat("\\end{document}", file = file)
+close(file)
+
+cat("Le fichier ", output_path, " a été généré avec succès.\n")

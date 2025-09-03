@@ -185,66 +185,129 @@ print_panel_results(panel_C_models, panel_C_vars, pvals_C_by_var, "PANEL C: Quot
 
 
 
-# Output in .tex files
 
-output_path <- "~/work/FWER Table 1.tex"
 
-# Fonction pour générer un bloc LaTeX pour un panel donné
-generate_panel_latex <- function(models, var_names, pvalues_by_var, panel_name, col_names) {
-  panel_tex <- c()
-  panel_tex <- c(panel_tex, "\\subsection*{", panel_name, "}\n")
-  panel_tex <- c(panel_tex, "\\begin{center}\n")
-  panel_tex <- c(panel_tex, "\\begin{tabular}{lccc}\n")
-  panel_tex <- c(panel_tex, "\\toprule\n")
-  panel_tex <- c(panel_tex, "Variable & Coeff (Std. Error) & p-value & FWER-adj p \\\\\n")
-  panel_tex <- c(panel_tex, "\\midrule\n")
-  
+
+#### Output in .tex file ####
+
+
+# output path
+output_path <- "~/work/FWER_table1.tex"
+
+# reference of the variable names
+var_labels <- c(
+  "INT_treatment" = "Treatment",
+  "RES05_gender" = "Reserved for Women (2005)",
+  "INT_treatment:RES05_gender" = "Treatment × Reserved for Women (2005)",
+  "INC05_running" = "Incumbent Runs",
+  "INC05_voteshare" = "Incumbent Vote Share",
+  "INCSPOUSE05_running" = "Incumbent Spouse Runs",
+  "INCSPOUSE05_voteshare" = "Incumbent Spouse Vote Share",
+  "INCOTHER05_running" = "Other Family Member Runs",
+  "INCOTHER05_voteshare" = "Other Family Member Vote Share"
+)
+
+# extracting the results for each panel
+extract_panel_results <- function(models, var_names, pvals_by_var) {
+  panel_results <- list()
   for (i in 1:length(models)) {
     model <- models[[i]]
     coef_table <- summary(model)$coefficients
-    dep_var_name <- col_names[i]
-    panel_tex <- c(panel_tex, "\\multicolumn{4}{l}{\\textit{--- ", dep_var_name, " ---}} \\\\\n")
+    dep_var_name <- names(models)[i]
+    
+    # coeff, std error, p-value
+    coefs <- data.frame(
+      Variable = rownames(coef_table),
+      Coeff = coef_table[, "Estimate"],
+      SE = coef_table[, "Std. Error"],
+      P = coef_table[, "Pr(>|t|)"]
+    )
+    
+    # add FWER-adj p
     for (var in var_names) {
       if (var %in% rownames(coef_table)) {
-        coef_val <- round(coef_table[var, "Estimate"], 4)
-        se_val <- round(coef_table[var, "Std. Error"], 4)
-        pval_raw <- round(coef_table[var, "Pr(>|t|)"], 4)
-        pval_adj <- round(pvalues_by_var[[var]][i], 4)
-        panel_tex <- c(panel_tex,
-                       sprintf("%s & %s (%s) & %s & %s \\\\",
-                               var, coef_val, se_val, pval_raw, pval_adj))
+        idx <- which(var_names == var)
+        coefs$FWER[coefs$Variable == var] <- pvals_by_var[[var]][i]
       }
     }
-    panel_tex <- c(panel_tex, "\\\\ \n")
+    
+    # filter the variables
+    coefs <- coefs[coefs$Variable %in% var_names, ]
+    
+    # clear names (possible to compile)
+    coefs$Variable <- var_labels[match(coefs$Variable, names(var_labels))]
+    
+    panel_results[[i]] <- list(
+      dep_var = var_labels[dep_var_name],
+      coefs = coefs
+    )
   }
-  panel_tex <- c(panel_tex, "\\bottomrule\n")
-  panel_tex <- c(panel_tex, "\\end{tabular}\n")
-  panel_tex <- c(panel_tex, "\\end{center}\n\n")
-  
-  return(panel_tex)
+  return(panel_results)
 }
 
-# Génération du contenu LaTeX pour chaque panel
-latex_content <- c(
-  "\\documentclass{article}\n",
-  "\\usepackage{booktabs}\n",
-  "\\begin{document}\n\n",
+# each panel: 
+panel_A_results <- extract_panel_results(panel_A_models, panel_A_vars, pvals_A_by_var)
+panel_B_results <- extract_panel_results(panel_B_models, panel_B_vars, pvals_B_by_var)
+panel_C_results <- extract_panel_results(panel_C_models, panel_C_vars, pvals_C_by_var)
+
+
+# function to write the panels in tex
+write_panel_to_tex <- function(file_path, panel_name, panel_results) {
+  file <- file(file_path, open = "at")  
   
-  generate_panel_latex(panel_A_models, panel_A_vars, pvals_A_by_var,
-                       "PANEL A: Average Effects", col_names),
+  cat("\\begin{table}[htbp]\n", file = file)
+  cat("\\centering\n", file = file)
+  cat("\\caption{" , panel_name, "}\n", file = file)
+  cat("\\label{tab:", gsub(" ", "_", tolower(panel_name)), "}\n", file = file)
+  cat("\\begin{tabular}{lccc}\n", file = file)
+  cat("\\toprule\n", file = file)
+  cat("\\multicolumn{4}{c}{", panel_name, "} \\\\\n", file = file)
+  cat("\\midrule\n", file = file)
   
-  generate_panel_latex(panel_B_models, panel_B_vars, pvals_B_by_var,
-                       "PANEL B: No Quota in 2005", col_names),
+  for (result in panel_results) {
+    cat("\\multicolumn{4}{l}{--- ", result$dep_var, " ---} \\\\\n", file = file)
+    cat("\\cmidrule(lr){1-4}\n", file = file)
+    cat("Variable & Coeff (Std. Error) & p-value & FWER-adj p \\\\\n", file = file)
+    cat("\\midrule\n", file = file)
+    
+    for (i in 1:nrow(result$coefs)) {
+      var_name <- result$coefs$Variable[i]
+      coef_val <- round(result$coefs$Coeff[i], 4)
+      se_val <- round(result$coefs$SE[i], 4)
+      p_val <- round(result$coefs$P[i], 4)
+      fwer_p <- round(result$coefs$FWER[i], 4)
+      
+      cat(var_name, " & ", coef_val, " (", se_val, ") & ", p_val, " & ", fwer_p, " \\\\\n", file = file)
+    }
+  }
+  cat("\\bottomrule\n", file = file)
+  cat("\\end{tabular}\n", file = file)
+  cat("\\end{table}\n\n", file = file)
   
-  generate_panel_latex(panel_C_models, panel_C_vars, pvals_C_by_var,
-                       "PANEL C: Quota in 2005", col_names),
-  
-  "\\end{document}"
+  close(file)
+}
+
+
+file <- file(output_path, open = "wt")  
+cat(
+  c(
+    "\\documentclass{article}",
+    "\\usepackage{booktabs}",
+    "\\usepackage[utf8]{inputenc}",
+    "\\usepackage{amsmath}",
+    "\\begin{document}\n"
+  ),
+  file = file, sep = "\n"
 )
+close(file)
 
-# Écriture dans le fichier
-writeLines(latex_content, output_path)
+# write each panel
+write_panel_to_tex(output_path, "PANEL A: Average Effects", panel_A_results)
+write_panel_to_tex(output_path, "PANEL B: No Quota in 2005", panel_B_results)
+write_panel_to_tex(output_path, "PANEL C: Quota in 2005", panel_C_results)
 
-# Affichage du chemin d'accès
-cat("Le fichier LaTeX a été généré à l'emplacement suivant :", output_path, "\n")
+
+file <- file(output_path, open = "at")
+cat("\\end{document}", file = file)
+close(file)
 
