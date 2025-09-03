@@ -16,7 +16,8 @@ library(webshot2)
 library(car)
 library(multcomp)
 
-# Variables de contrôle et dépendantes
+
+# Controls and dependent variables
 gpcontrols <- c("GP_population", "GP_lit", "GP_sc", "GP_st", "GP_nbvillages",
                 "RES00_gender", "RES00_obc", "RES00_sc", "RES00_st",
                 "RES10_obc", "RES10_sc", "RES10_st", "RES05_obc", "RES05_sc", "RES05_st")
@@ -24,7 +25,7 @@ incum_dep_vars1 <- c("INC05_running", "INC05_voteshare",
                      "INCSPOUSE05_running", "INCSPOUSE05_voteshare",
                      "INCOTHER05_running", "INCOTHER05_voteshare")
 
-# Chargement et filtrage des données
+# Loading and filtering the data
 data <- read_dta("~/work/Electoral data cleaned.dta")
 data_filtered <- data %>%
   filter(RES10_gender == 0 & SAMPLE_hhsurvey == 1 & GP_tag == 1 & INC05_can_run == 1) %>%
@@ -34,7 +35,7 @@ data_filtered <- data %>%
     FAMnotINC05_won = INCorFAM05_won - INC05_won
   )
 
-# Fonction pour créer les formules de régression
+# Function for regression formulas
 create_formula <- function(dep_var, model_type) {
   base_controls <- paste(gpcontrols, collapse = " + ")
   if (model_type == "any_treatment") {
@@ -47,7 +48,8 @@ create_formula <- function(dep_var, model_type) {
   return(as.formula(formula_str))
 }
 
-# Fonction pour extraire les p-values et appliquer la correction FWER
+
+# Function to extract p-values and apply fwer correction
 get_adjusted_pvalues <- function(models, var_names) {
   all_pvalues <- c()
   for (model in models) {
@@ -59,11 +61,12 @@ get_adjusted_pvalues <- function(models, var_names) {
   return(data.frame(raw = all_pvalues, adjusted = adjusted_pvalues))
 }
 
-# Estimation des modèles pour chaque panel
+
+# Model estimation for each panel
 models_list <- list()
 control_means <- list()
 
-# Panel A : effets moyens (toutes les observations)
+# Panel A : mean effect, whole sample of observations
 for (i in 1:length(incum_dep_vars1)) {
   dep_var <- incum_dep_vars1[i]
   control_mean <- data_filtered %>%
@@ -77,7 +80,7 @@ for (i in 1:length(incum_dep_vars1)) {
   models_list[[paste0("A_", i)]] <- model
 }
 
-# Panel B : sans quota en 2005 (RES05_gender == 0)
+# Panel B : RES05_gender == 0
 data_panel_B <- data_filtered %>% filter(RES05_gender == 0)
 for (i in 1:length(incum_dep_vars1)) {
   dep_var <- incum_dep_vars1[i]
@@ -92,7 +95,7 @@ for (i in 1:length(incum_dep_vars1)) {
   models_list[[paste0("B_", i)]] <- model
 }
 
-# Panel C : avec quota en 2005 (RES05_gender == 1)
+# Panel C : RES05_gender == 1
 data_panel_C <- data_filtered %>% filter(RES05_gender == 1)
 for (i in 1:length(incum_dep_vars1)) {
   dep_var <- incum_dep_vars1[i]
@@ -107,24 +110,27 @@ for (i in 1:length(incum_dep_vars1)) {
   models_list[[paste0("C_", i)]] <- model
 }
 
-# Variables pour chaque panel 
+
+# Variables for each panel
+# Knowing that by construction, no variation of RES05_gender in B, C
 panel_A_vars <- c("INT_treatment", "RES05_gender", "INT_treatment:RES05_gender")
-panel_B_vars <- c("INT_treatment")  # RES05_gender est constante = 0, donc pas estimée
-panel_C_vars <- c("INT_treatment")  # RES05_gender est constante = 1, donc pas estimée
+panel_B_vars <- c("INT_treatment")  # RES05_gender constant = 0
+panel_C_vars <- c("INT_treatment")  # RES05_gender constant = 1
 
 
 
-# Extraction des modèles par panel
+# Extracting the models for each panel
 panel_A_models <- models_list[1:6]
 panel_B_models <- models_list[7:12]
 panel_C_models <- models_list[13:18]
 
-# Application des corrections FWER
+# Implementation of FWER correction
 pvalues_panel_A <- get_adjusted_pvalues(panel_A_models, panel_A_vars)
 pvalues_panel_B <- get_adjusted_pvalues(panel_B_models, panel_B_vars)
 pvalues_panel_C <- get_adjusted_pvalues(panel_C_models, panel_C_vars)
 
-# Fonction pour extraire les p-values ajustées par variable
+
+# Function to extract the adjusted p-values
 get_pvals_by_var <- function(pvalues_df, var_names, n_models) {
   pvals_list <- list()
   for (i in 1:length(var_names)) {
@@ -139,7 +145,9 @@ pvals_A_by_var <- get_pvals_by_var(pvalues_panel_A, panel_A_vars, length(panel_A
 pvals_B_by_var <- get_pvals_by_var(pvalues_panel_B, panel_B_vars, length(panel_B_models))
 pvals_C_by_var <- get_pvals_by_var(pvalues_panel_C, panel_C_vars, length(panel_C_models))
 
-# Fonction pour afficher les résultats
+
+
+# Function to display the results
 print_panel_results <- function(models, var_names, pvalues_by_var, panel_name) {
   cat("\n\n======================================================================\n")
   cat(panel_name, "\n")
@@ -165,12 +173,78 @@ print_panel_results <- function(models, var_names, pvalues_by_var, panel_name) {
   }
 }
 
-# Noms des colonnes pour l'affichage
+# names to display
 col_names <- c("Incumbent Runs", "Incumbent Vote Share",
                "Incumbent Spouse Runs", "Incumbent Spouse Vote Share",
                "Other Family Member Runs", "Other Family Member Vote Share")
 
-# Affichage des résultats
+# Displaying the results (print)
 print_panel_results(panel_A_models, panel_A_vars, pvals_A_by_var, "PANEL A: Average Effects")
 print_panel_results(panel_B_models, panel_B_vars, pvals_B_by_var, "PANEL B: No Quota in 2005")
 print_panel_results(panel_C_models, panel_C_vars, pvals_C_by_var, "PANEL C: Quota in 2005")
+
+
+
+# Output in .tex files
+
+output_path <- "~/work/FWER Table 1.tex"
+
+# Fonction pour générer un bloc LaTeX pour un panel donné
+generate_panel_latex <- function(models, var_names, pvalues_by_var, panel_name, col_names) {
+  panel_tex <- c()
+  panel_tex <- c(panel_tex, "\\subsection*{", panel_name, "}\n")
+  panel_tex <- c(panel_tex, "\\begin{center}\n")
+  panel_tex <- c(panel_tex, "\\begin{tabular}{lccc}\n")
+  panel_tex <- c(panel_tex, "\\toprule\n")
+  panel_tex <- c(panel_tex, "Variable & Coeff (Std. Error) & p-value & FWER-adj p \\\\\n")
+  panel_tex <- c(panel_tex, "\\midrule\n")
+  
+  for (i in 1:length(models)) {
+    model <- models[[i]]
+    coef_table <- summary(model)$coefficients
+    dep_var_name <- col_names[i]
+    panel_tex <- c(panel_tex, "\\multicolumn{4}{l}{\\textit{--- ", dep_var_name, " ---}} \\\\\n")
+    for (var in var_names) {
+      if (var %in% rownames(coef_table)) {
+        coef_val <- round(coef_table[var, "Estimate"], 4)
+        se_val <- round(coef_table[var, "Std. Error"], 4)
+        pval_raw <- round(coef_table[var, "Pr(>|t|)"], 4)
+        pval_adj <- round(pvalues_by_var[[var]][i], 4)
+        panel_tex <- c(panel_tex,
+                       sprintf("%s & %s (%s) & %s & %s \\\\",
+                               var, coef_val, se_val, pval_raw, pval_adj))
+      }
+    }
+    panel_tex <- c(panel_tex, "\\\\ \n")
+  }
+  panel_tex <- c(panel_tex, "\\bottomrule\n")
+  panel_tex <- c(panel_tex, "\\end{tabular}\n")
+  panel_tex <- c(panel_tex, "\\end{center}\n\n")
+  
+  return(panel_tex)
+}
+
+# Génération du contenu LaTeX pour chaque panel
+latex_content <- c(
+  "\\documentclass{article}\n",
+  "\\usepackage{booktabs}\n",
+  "\\begin{document}\n\n",
+  
+  generate_panel_latex(panel_A_models, panel_A_vars, pvals_A_by_var,
+                       "PANEL A: Average Effects", col_names),
+  
+  generate_panel_latex(panel_B_models, panel_B_vars, pvals_B_by_var,
+                       "PANEL B: No Quota in 2005", col_names),
+  
+  generate_panel_latex(panel_C_models, panel_C_vars, pvals_C_by_var,
+                       "PANEL C: Quota in 2005", col_names),
+  
+  "\\end{document}"
+)
+
+# Écriture dans le fichier
+writeLines(latex_content, output_path)
+
+# Affichage du chemin d'accès
+cat("Le fichier LaTeX a été généré à l'emplacement suivant :", output_path, "\n")
+
