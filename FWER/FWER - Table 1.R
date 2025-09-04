@@ -191,6 +191,9 @@ print_panel_results(panel_C_models, panel_C_vars, pvals_C_by_var, "PANEL C: Quot
 #### Output in .tex file ####
 
 
+
+## version corrigée avec les noms des variables
+
 # output path
 output_path <- "~/work/FWER_table1.tex"
 
@@ -207,15 +210,15 @@ var_labels <- c(
   "INCOTHER05_voteshare" = "Other Family Member Vote Share"
 )
 
-# extracting the results for each panel
-extract_panel_results <- function(models, var_names, pvals_by_var) {
+# Fonction pour extraire les résultats des modèles avec les noms de variables modifiés
+extract_panel_results <- function(models, var_names, pvals_by_var, var_labels) {
   panel_results <- list()
   for (i in 1:length(models)) {
     model <- models[[i]]
     coef_table <- summary(model)$coefficients
     dep_var_name <- names(models)[i]
     
-    # coeff, std error, p-value
+    # Extraire les coefficients, erreurs standards, p-values
     coefs <- data.frame(
       Variable = rownames(coef_table),
       Coeff = coef_table[, "Estimate"],
@@ -223,7 +226,7 @@ extract_panel_results <- function(models, var_names, pvals_by_var) {
       P = coef_table[, "Pr(>|t|)"]
     )
     
-    # add FWER-adj p
+    # Ajouter les p-values ajustées (FWER)
     for (var in var_names) {
       if (var %in% rownames(coef_table)) {
         idx <- which(var_names == var)
@@ -231,33 +234,30 @@ extract_panel_results <- function(models, var_names, pvals_by_var) {
       }
     }
     
-    # filter the variables
+    # Filtrer uniquement les variables d'intérêt
     coefs <- coefs[coefs$Variable %in% var_names, ]
     
-    # clear names (possible to compile)
-    coefs$Variable <- var_labels[match(coefs$Variable, names(var_labels))]
+    # Remplacer les noms des variables par les étiquettes
+    coefs$Variable <- var_labels[coefs$Variable]
+    
+    # Nom de la variable dépendante (pour l'affichage)
+    dep_var_label <- var_labels[dep_var_name]
     
     panel_results[[i]] <- list(
-      dep_var = var_labels[dep_var_name],
+      dep_var = dep_var_label,
       coefs = coefs
     )
   }
   return(panel_results)
 }
 
-# each panel: 
-panel_A_results <- extract_panel_results(panel_A_models, panel_A_vars, pvals_A_by_var)
-panel_B_results <- extract_panel_results(panel_B_models, panel_B_vars, pvals_B_by_var)
-panel_C_results <- extract_panel_results(panel_C_models, panel_C_vars, pvals_C_by_var)
-
-
-# function to write the panels in tex
+# Fonction pour écrire les résultats dans un fichier .tex
 write_panel_to_tex <- function(file_path, panel_name, panel_results) {
-  file <- file(file_path, open = "at")  
+  file <- file(file_path, open = "at")
   
   cat("\\begin{table}[htbp]\n", file = file)
   cat("\\centering\n", file = file)
-  cat("\\caption{" , panel_name, "}\n", file = file)
+  cat("\\caption{", panel_name, "}\n", file = file)
   cat("\\label{tab:", gsub(" ", "_", tolower(panel_name)), "}\n", file = file)
   cat("\\begin{tabular}{lccc}\n", file = file)
   cat("\\toprule\n", file = file)
@@ -267,7 +267,7 @@ write_panel_to_tex <- function(file_path, panel_name, panel_results) {
   for (result in panel_results) {
     cat("\\multicolumn{4}{l}{--- ", result$dep_var, " ---} \\\\\n", file = file)
     cat("\\cmidrule(lr){1-4}\n", file = file)
-    cat("Variable & Coeff (Std. Error) & p-value & FWER-adj p \\\\\n", file = file)
+    cat("Variable & Coefficient (Std. Error) & p-value & FWER-adj p \\\\\n", file = file)
     cat("\\midrule\n", file = file)
     
     for (i in 1:nrow(result$coefs)) {
@@ -280,6 +280,7 @@ write_panel_to_tex <- function(file_path, panel_name, panel_results) {
       cat(var_name, " & ", coef_val, " (", se_val, ") & ", p_val, " & ", fwer_p, " \\\\\n", file = file)
     }
   }
+  
   cat("\\bottomrule\n", file = file)
   cat("\\end{tabular}\n", file = file)
   cat("\\end{table}\n\n", file = file)
@@ -287,8 +288,8 @@ write_panel_to_tex <- function(file_path, panel_name, panel_results) {
   close(file)
 }
 
-
-file <- file(output_path, open = "wt")  
+# Écrire chaque panel dans le fichier .tex
+file <- file(output_path, open = "wt")
 cat(
   c(
     "\\documentclass{article}",
@@ -301,57 +302,60 @@ cat(
 )
 close(file)
 
-# write each panel
+# Extraire les résultats pour chaque panel avec les noms modifiés
+panel_A_results <- extract_panel_results(panel_A_models, panel_A_vars, pvals_A_by_var, var_labels)
+panel_B_results <- extract_panel_results(panel_B_models, panel_B_vars, pvals_B_by_var, var_labels)
+panel_C_results <- extract_panel_results(panel_C_models, panel_C_vars, pvals_C_by_var, var_labels)
+
+# Écrire chaque panel dans le fichier .tex
 write_panel_to_tex(output_path, "PANEL A: Average Effects", panel_A_results)
 write_panel_to_tex(output_path, "PANEL B: No Quota in 2005", panel_B_results)
 write_panel_to_tex(output_path, "PANEL C: Quota in 2005", panel_C_results)
-
 
 file <- file(output_path, open = "at")
 cat("\\end{document}", file = file)
 close(file)
 
-##################################################################################
 
 
 
-## version corrigée avec les noms des variables
+########################
 
 
 
+
+
+#################################################################################
 #### Output in .tex file ####
+## Version corrigée : affiche le nom de la variable dépendante au-dessus de chaque groupe de régression
 # output path
-output_path <- "~/work/FWER_table1_bis.tex"
+output_path <- "~/work/FWER_table1.tex"
 
-# reference of the variable names
+# Référence des noms des variables
 var_labels <- c(
   "INT_treatment" = "Treatment",
   "RES05_gender" = "Reserved for Women (2005)",
-  "INT_treatment:RES05_gender" = "Treatment × Reserved for Women (2005)",
-  "INC05_running" = "Incumbent Runs",
-  "INC05_voteshare" = "Incumbent Vote Share",
-  "INCSPOUSE05_running" = "Incumbent Spouse Runs",
-  "INCSPOUSE05_voteshare" = "Incumbent Spouse Vote Share",
-  "INCOTHER05_running" = "Other Family Member Runs",
-  "INCOTHER05_voteshare" = "Other Family Member Vote Share"
+  "INT_treatment:RES05_gender" = "Treatment × Reserved for Women (2005)"
 )
 
-# Ajoute aussi les labels pour les variables dépendantes si nécessaire
+# Liste des noms des variables dépendantes dans l'ordre des modèles
 dep_var_labels <- c(
-  "dep_var1" = "Label pour Variable Dépendante 1",
-  "dep_var2" = "Label pour Variable Dépendante 2"
-  # Ajoute ici toutes les variables dépendantes que tu utilises
+  "Incumbent Runs",
+  "Incumbent Vote Share",
+  "Incumbent Spouse Runs",
+  "Incumbent Spouse Vote Share",
+  "Other Family Member Runs",
+  "Other Family Member Vote Share"
 )
 
-# extracting the results for each panel
-extract_panel_results <- function(models, var_names, pvals_by_var) {
+# Fonction pour extraire les résultats des modèles avec les noms de variables modifiés
+extract_panel_results <- function(models, var_names, pvals_by_var, var_labels) {
   panel_results <- list()
   for (i in 1:length(models)) {
     model <- models[[i]]
     coef_table <- summary(model)$coefficients
-    dep_var_name <- names(models)[i]
     
-    # coeff, std error, p-value
+    # Extraire les coefficients, erreurs standards, p-values
     coefs <- data.frame(
       Variable = rownames(coef_table),
       Coeff = coef_table[, "Estimate"],
@@ -359,7 +363,7 @@ extract_panel_results <- function(models, var_names, pvals_by_var) {
       P = coef_table[, "Pr(>|t|)"]
     )
     
-    # add FWER-adj p
+    # Ajouter les p-values ajustées (FWER)
     for (var in var_names) {
       if (var %in% rownames(coef_table)) {
         idx <- which(var_names == var)
@@ -367,62 +371,51 @@ extract_panel_results <- function(models, var_names, pvals_by_var) {
       }
     }
     
-    # filter the variables
+    # Filtrer uniquement les variables d'intérêt
     coefs <- coefs[coefs$Variable %in% var_names, ]
     
-    # clear names (possible to compile)
-    coefs$Variable <- var_labels[match(coefs$Variable, names(var_labels))]
+    # Remplacer les noms des variables par les labels
+    coefs$Variable <- var_labels[coefs$Variable]
     
-    # Utilise dep_var_labels pour les noms des variables dépendantes
-    dep_var_label <- ifelse(dep_var_name %in% names(dep_var_labels),
-                            dep_var_labels[dep_var_name],
-                            dep_var_name)
-    
-    panel_results[[i]] <- list(
-      dep_var = dep_var_label,
-      coefs = coefs
-    )
+    panel_results[[i]] <- coefs
   }
   return(panel_results)
 }
 
-# each panel:
-panel_A_results <- extract_panel_results(panel_A_models, panel_A_vars, pvals_A_by_var)
-panel_B_results <- extract_panel_results(panel_B_models, panel_B_vars, pvals_B_by_var)
-panel_C_results <- extract_panel_results(panel_C_models, panel_C_vars, pvals_C_by_var)
-
-# function to write the panels in tex
+# Fonction pour écrire les résultats dans un fichier .tex
 write_panel_to_tex <- function(file_path, panel_name, panel_results) {
   file <- file(file_path, open = "at")
   
   cat("\\begin{table}[htbp]\n", file = file)
   cat("\\centering\n", file = file)
-  cat("\\caption{" , panel_name, "}\n", file = file)
+  cat("\\caption{", panel_name, "}\n", file = file)
   cat("\\label{tab:", gsub(" ", "_", tolower(panel_name)), "}\n", file = file)
   cat("\\begin{tabular}{lccc}\n", file = file)
   cat("\\toprule\n", file = file)
   cat("\\multicolumn{4}{c}{", panel_name, "} \\\\\n", file = file)
   cat("\\midrule\n", file = file)
   
-  for (result in panel_results) {
-    cat("\\multicolumn{4}{l}{--- ", result$dep_var, " ---} \\\\\n", file = file)
+  for (i in 1:length(panel_results)) {
+    result <- panel_results[[i]]
+    dep_var_label <- dep_var_labels[i] # Label de la variable dépendante
+    
+    # Ajouter le nom de la variable dépendante au-dessus des résultats
+    cat("\\multicolumn{4}{l}{\\textbf{", dep_var_label, "}} \\\\\n", file = file)
     cat("\\cmidrule(lr){1-4}\n", file = file)
-    cat("Variable & Coeff (Std. Error) & p-value & FWER-adj p \\\\\n", file = file)
+    cat("Variable & Coefficient (Std. Error) & p-value & FWER-adj p \\\\\n", file = file)
     cat("\\midrule\n", file = file)
     
-    for (i in 1:nrow(result$coefs)) {
-      var_name <- result$coefs$Variable[i]
-      coef_val <- round(result$coefs$Coeff[i], 4)
-      se_val <- round(result$coefs$SE[i], 4)
-      p_val <- round(result$coefs$P[i], 4)
-      fwer_p <- round(result$coefs$FWER[i], 4)
-      
-      # Remplace les "×" par $\\times$ pour le mode mathématique
-      var_name <- gsub("×", "\\\\$\\\\times\\\\$", var_name)
+    for (j in 1:nrow(result)) {
+      var_name <- result$Variable[j]
+      coef_val <- round(result$Coeff[j], 4)
+      se_val <- round(result$SE[j], 4)
+      p_val <- round(result$P[j], 4)
+      fwer_p <- round(result$FWER[j], 4)
       
       cat(var_name, " & ", coef_val, " (", se_val, ") & ", p_val, " & ", fwer_p, " \\\\\n", file = file)
     }
   }
+  
   cat("\\bottomrule\n", file = file)
   cat("\\end{tabular}\n", file = file)
   cat("\\end{table}\n\n", file = file)
@@ -430,5 +423,31 @@ write_panel_to_tex <- function(file_path, panel_name, panel_results) {
   close(file)
 }
 
+# Écrire l'en-tête du fichier .tex
+file <- file(output_path, open = "wt")
+cat(
+  c(
+    "\\documentclass{article}",
+    "\\usepackage{booktabs}",
+    "\\usepackage[utf8]{inputenc}",
+    "\\usepackage{amsmath}",
+    "\\begin{document}\n"
+  ),
+  file = file,
+  sep = "\n"
+)
+close(file)
 
+# Extraire les résultats pour chaque panel avec les noms modifiés
+panel_A_results <- extract_panel_results(panel_A_models, panel_A_vars, pvals_A_by_var, var_labels)
+panel_B_results <- extract_panel_results(panel_B_models, panel_B_vars, pvals_B_by_var, var_labels)
+panel_C_results <- extract_panel_results(panel_C_models, panel_C_vars, pvals_C_by_var, var_labels)
 
+# Écrire chaque panel dans le fichier .tex
+write_panel_to_tex(output_path, "PANEL A: Average Effects", panel_A_results)
+write_panel_to_tex(output_path, "PANEL B: No Quota in 2005", panel_B_results)
+write_panel_to_tex(output_path, "PANEL C: Quota in 2005", panel_C_results)
+
+file <- file(output_path, open = "at")
+cat("\\end{document}", file = file)
+close(file)
