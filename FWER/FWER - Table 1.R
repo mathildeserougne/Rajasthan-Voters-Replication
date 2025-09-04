@@ -192,8 +192,6 @@ print_panel_results(panel_C_models, panel_C_vars, pvals_C_by_var, "PANEL C: Quot
 
 
 
-## version corrigée avec les noms des variables
-
 # output path
 output_path <- "~/work/FWER_table1.tex"
 
