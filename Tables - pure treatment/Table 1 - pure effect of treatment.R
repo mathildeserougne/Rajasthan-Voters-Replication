@@ -1,0 +1,120 @@
+# T1 - pure effect of treatment
+# effect of the treatment but on separate subsamples.
+# no interaction anymore between treatment and previous gender quotas.
+
+
+library(tidyverse)
+library(stargazer)
+library(fixest)
+library(modelsummary)
+
+# DATA
+data <- read_dta("~/work/Electoral data cleaned.dta")
+
+# Original filters
+data_filtered <- data %>%
+  filter(RES10_gender == 0 & SAMPLE_hhsurvey == 1 & GP_tag == 1 & INC05_can_run == 1) %>%
+  mutate(
+    FAMnotINC05_running = INCorFAM05_running - INC05_running,
+    FAMnotINC05_voteshare = INCorFAM05_voteshare - INC05_voteshare,
+    FAMnotINC05_won = INCorFAM05_won - INC05_won
+  )
+
+# Dep variables
+incum_dep_vars1 <- c("INC05_running", "INC05_voteshare",
+                     "INCSPOUSE05_running", "INCSPOUSE05_voteshare",
+                     "INCOTHER05_running", "INCOTHER05_voteshare")
+
+# Controls
+gpcontrols <- c("GP_population", "GP_lit", "GP_sc", "GP_st", "GP_nbvillages",
+                "RES00_gender", "RES00_obc", "RES00_sc", "RES00_st",
+                "RES10_obc", "RES10_sc", "RES10_st", "RES05_obc", "RES05_sc", "RES05_st")
+
+
+
+# REGRESSION FORMULA
+create_formula <- function(dep_var) {
+  base_controls <- paste(gpcontrols, collapse = " + ")
+  formula_str <- paste(dep_var, "~ INT_treatment +", base_controls, "+ factor(district)")
+  return(as.formula(formula_str))
+}
+
+# Estimate models on a given subsample: 
+estimate_models <- function(data_subset) {
+  models <- list()
+  for (i in 1:length(incum_dep_vars1)) {
+    dep_var <- incum_dep_vars1[i]
+    formula <- create_formula(dep_var)
+    model <- lm(formula, data = data_subset)
+    models[[i]] <- model
+  }
+  return(models)
+}
+
+# Panel A :whole sample
+panel_A <- estimate_models(data_filtered)
+
+# Panel B : RES05_gender == 0
+panel_B <- estimate_models(filter(data_filtered, RES05_gender == 0))
+
+# Panel C : RES05_gender == 1
+panel_C <- estimate_models(filter(data_filtered, RES05_gender == 1))
+
+
+## OUTPUT ## 
+
+# column names for stargazer
+col_names <- c("Incumbent Runs", "Incumbent Vote Share",
+               "Incumbent Spouse Runs", "Incumbent Spouse Vote Share",
+               "Other Family Member Runs", "Other Family Member Vote Share")
+
+# variables to display
+outregvar <- "INT_treatment"
+
+# generating the table (three panels)
+stargazer(
+  panel_A, panel_B, panel_C,
+  type = "text",
+  column.labels = c(
+    "Panel A: Full Sample",
+    rep("", length(incum_dep_vars1) - 1),
+    "Panel B: RES05_gender = 0",
+    rep("", length(incum_dep_vars1) - 1),
+    "Panel C: RES05_gender = 1",
+    rep("", length(incum_dep_vars1) - 1)
+  ),
+  model.numbers = FALSE,
+  keep = outregvar,
+  digits = 2,
+  title = "Table: Effects of INT_treatment by Gender Reservation Status",
+  out = "~/work/Table1_Panels_ABC.txt"
+)
+
+
+
+## vertical stacking of the panels
+
+
+sink("~/work/Table1_Panels_ABC_Stacked.txt")
+
+cat("Table: Effects of INT_treatment by Gender Reservation Status (Stacked)\n")
+cat("========================================================================\n\n")
+
+cat("Panel A: Full Sample\n")
+cat("------------------------------------------------------------\n")
+stargazer(panel_A, type = "text", keep = "INT_treatment", digits = 2,
+          dep.var.labels = col_names, model.numbers = FALSE, omit = "Intercept")
+
+cat("\nPanel B: RES05_gender = 0\n")
+cat("------------------------------------------------------------\n")
+stargazer(panel_B, type = "text", keep = "INT_treatment", digits = 2,
+          dep.var.labels = col_names, model.numbers = FALSE, omit = "Intercept")
+
+cat("\nPanel C: RES05_gender = 1\n")
+cat("------------------------------------------------------------\n")
+stargazer(panel_C, type = "text", keep = "INT_treatment", digits = 2,
+          dep.var.labels = col_names, model.numbers = FALSE, omit = "Intercept")
+
+sink()
+
+
