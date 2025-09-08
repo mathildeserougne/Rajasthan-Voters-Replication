@@ -415,3 +415,9 @@ print_selected_results(models_list, outregvar2, pvals_C_by_var_selected,
                        control_means, indices, incum_dep_vars_voteshare, selected_models_C)
 
 
+
+
+## .TEX OUTPUT ##
+
+
+
