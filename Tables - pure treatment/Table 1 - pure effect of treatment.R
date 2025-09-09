@@ -71,25 +71,6 @@ col_names <- c("Incumbent Runs", "Incumbent Vote Share",
 # variables to display
 outregvar <- "INT_treatment"
 
-# generating the table (three panels)
-stargazer(
-  panel_A, panel_B, panel_C,
-  type = "text",
-  column.labels = c(
-    "Panel A: Full Sample",
-    rep("", length(incum_dep_vars1) - 1),
-    "Panel B: RES05_gender = 0",
-    rep("", length(incum_dep_vars1) - 1),
-    "Panel C: RES05_gender = 1",
-    rep("", length(incum_dep_vars1) - 1)
-  ),
-  model.numbers = FALSE,
-  keep = outregvar,
-  digits = 2,
-  title = "Table: Effects of INT_treatment by Gender Reservation Status",
-  out = "~/work/Table1_Panels_ABC.txt"
-)
-
 
 
 ## vertical stacking of the panels
@@ -117,4 +98,8 @@ stargazer(panel_C, type = "text", keep = "INT_treatment", digits = 2,
 
 sink()
 
+
+
+
+## .TEX OUTPUT
 
