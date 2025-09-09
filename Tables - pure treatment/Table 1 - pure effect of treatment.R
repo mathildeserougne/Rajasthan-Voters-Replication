@@ -103,3 +103,92 @@ sink()
 
 ## .TEX OUTPUT
 
+
+# Charger la bibliothèque
+library(stargazer)
+
+# Créer un fichier .tex avec la table
+sink("~/work/Table1_Panels_ABC_Stacked.tex")
+
+# En-tête LaTeX minimal
+cat(
+  '
+\\documentclass{article}
+\\begin{document}
+'
+)
+
+# Panel A
+cat("\\textbf{Panel A: Full Sample}\\\\")
+stargazer(
+  panel_A,
+  type = "latex",
+  keep = "INT_treatment",
+  digits = 2,
+  dep.var.labels = col_names,
+  model.numbers = FALSE,
+  omit = "Intercept",
+  covariate.labels = c("INT treatment"),  # Remplace les underscores
+  out = "temp_A.tex"  # Sauvegarde temporaire
+)
+
+# Panel B
+cat("\\\\ \\textbf{Panel B: RES05 gender = 0}\\\\")
+stargazer(
+  panel_B,
+  type = "latex",
+  keep = "INT_treatment",
+  digits = 2,
+  dep.var.labels = col_names,
+  model.numbers = FALSE,
+  omit = "Intercept",
+  covariate.labels = c("INT treatment"),
+  out = "temp_B.tex"
+)
+
+# Panel C
+cat("\\\\ \\textbf{Panel C: RES05 gender = 1}\\\\")
+stargazer(
+  panel_C,
+  type = "latex",
+  keep = "INT_treatment",
+  digits = 2,
+  dep.var.labels = col_names,
+  model.numbers = FALSE,
+  omit = "Intercept",
+  covariate.labels = c("INT treatment"),
+  out = "temp_C.tex"
+)
+
+# Fermeture du document LaTeX
+cat(
+  '
+\\end{document}
+'
+)
+
+sink()
+
+# Combiner les fichiers temporaires en un seul
+combined_table <- c(
+  readLines("Table1_Panels_ABC_Stacked.tex"),
+  readLines("temp_A.tex"),
+  readLines("temp_B.tex"),
+  readLines("temp_C.tex")
+)
+
+# Sauvegarder le fichier final
+writeLines(combined_table, "Table1_Panels_ABC_Stacked_final.tex")
+
+# Supprimer les fichiers temporaires
+file.remove(c("temp_A.tex", "temp_B.tex", "temp_C.tex"))
+
+
+
+
+
+
+## tentative version paysage
+
+
+
