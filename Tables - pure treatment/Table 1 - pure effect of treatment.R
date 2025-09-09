@@ -186,9 +186,7 @@ file.remove(c("temp_A.tex", "temp_B.tex", "temp_C.tex"))
 
 
 
-
-
-## tentative version paysage
-
+# unfortunately, too wide. and cannot change the font size on stargazer.
+# one would have to manually change it on the tex script.
 
 
