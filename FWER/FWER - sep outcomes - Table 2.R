@@ -419,6 +419,3 @@ print_selected_results(models_list, outregvar2, pvals_C_by_var_selected,
 
 ## .TEX OUTPUT ##
 
-
-
-print(sapply(models_list, function(m) !is.null(m)))
