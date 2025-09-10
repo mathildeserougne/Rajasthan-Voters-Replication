@@ -8,7 +8,7 @@
 
 # but moreover, we split along previous gender reservation.
 # so FOUR TABLES in total.
-
+install.packages(c("tidyverse","stargazer","fixest","haven","lmtest","car","multcomp"))
 # FWER Table 2 - performance, split by family and RES05_gender
 # Loading required libraries
 library(tidyverse)
@@ -421,3 +421,4 @@ print_selected_results(models_list, outregvar2, pvals_C_by_var_selected,
 
 
 
+print(sapply(models_list, function(m) !is.null(m)))
