@@ -188,6 +188,20 @@ voteshare_results_gender1 <- lapply(1:length(voteshare_dep_vars), function(i) {
                     adjusted_pvalues_voteshare_gender1, (i-1)*length(var_names_sub))
 })
 
+
+
+# Define labels for your dependent variables
+running_dep_var_labels <- c("INC05 running", "INCSPOUSE05 running", "INCOTHER 05 running")
+voteshare_dep_var_labels <- c("INC05 vote share", "INCSPOUSE05 vote share", "INCOTHER 05 vote share")
+
+# Define labels for your variables of interest
+var_labels <- c(
+  "INT_treatment" = "Treatment",
+  "RES05_gender1" = "Previously gender reserved",
+  "INT_treatment:RES05_gender1" = "Interaction Treatment × GQ"
+)
+
+
 # display results in the console
 print_results <- function(results_list, dep_var_labels, sample_name, panel_name) {
   cat("\n\n")

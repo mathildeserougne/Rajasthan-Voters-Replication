@@ -128,7 +128,7 @@ panel_A_models_selected <- models_list[selected_models_A]
 panel_B_models_selected <- models_list[selected_models_B]
 panel_C_models_selected <- models_list[selected_models_C]
 
-# Variables d'intérêt
+# interest variables
 outregvar2 <- c("INT_treatment", "RES05_gender", "X_anytr_genderres05")
 
 # Function to extract p-values and apply the FWER correction
@@ -226,8 +226,23 @@ print_selected_results(models_list, outregvar2, pvals_C_by_var_selected,
 
 
 
+# saving the results of family 1
+sink("~/work/fwer_table3_part1_results.txt")
+print_selected_results(models_list, outregvar2, pvals_A_by_var_selected,
+                       "SELECTED MODELS: Full Sample",
+                       control_means, dep_vars, selected_models_A)
+print_selected_results(models_list, outregvar2, pvals_B_by_var_selected,
+                       "SELECTED MODELS: Without Previous Gender Reservation (RES05_gender == 0)",
+                       control_means, dep_vars, selected_models_B)
+print_selected_results(models_list, outregvar2, pvals_C_by_var_selected,
+                       "SELECTED MODELS: With Previous Gender Reservation (RES05_gender == 1)",
+                       control_means, dep_vars, selected_models_C)
+sink()
 
-### PART TWO
+
+
+
+### PART TWO ################################################
 
 
 # FWER on selected outcomes: number candidates, number challengers, vote share female challengers, vote share low caste challengers
@@ -349,7 +364,7 @@ panel_A_models_selected <- models_list[selected_models_A]
 panel_B_models_selected <- models_list[selected_models_B]
 panel_C_models_selected <- models_list[selected_models_C]
 
-# Variables d'intérêt
+# variables
 outregvar2 <- c("INT_treatment", "RES05_gender", "X_anytr_genderres05")
 
 # Function to extract p-values and apply the FWER correction
@@ -446,5 +461,33 @@ print_selected_results(models_list, outregvar2, pvals_C_by_var_selected,
                        control_means, dep_vars, selected_models_C)
 
 
+# saving the results of family 2
+sink("~/work/fwer_table3_part2_results.txt")
+print_selected_results(models_list, outregvar2, pvals_A_by_var_selected,
+                       "SELECTED MODELS: Full Sample",
+                       control_means, dep_vars, selected_models_A)
+print_selected_results(models_list, outregvar2, pvals_B_by_var_selected,
+                       "SELECTED MODELS: Without Previous Gender Reservation (RES05_gender == 0)",
+                       control_means, dep_vars, selected_models_B)
+print_selected_results(models_list, outregvar2, pvals_C_by_var_selected,
+                       "SELECTED MODELS: With Previous Gender Reservation (RES05_gender == 1)",
+                       control_means, dep_vars, selected_models_C)
+sink()
 
+
+
+## FINAL OUTPUT 
+
+# merge the temporary files we saved
+final_file <- "~/work/FWER_Table3_sep_outcomes.txt"
+
+
+writeLines(readLines("~/work/fwer_table3_part1_results.txt"), final_file)
+
+con <- file(final_file, open = "a")
+writeLines(readLines("~/work/fwer_table3_part2_results.txt"), con)
+close(con)
+
+# delete temporary files
+file.remove("~/work/fwer_table3_part1_results.txt", "~/work/fwer_table3_part2_results.txt")
 

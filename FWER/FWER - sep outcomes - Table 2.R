@@ -8,7 +8,7 @@
 
 # but moreover, we split along previous gender reservation.
 # so FOUR TABLES in total.
-install.packages(c("tidyverse","stargazer","fixest","haven","lmtest","car","multcomp"))
+#install.packages(c("tidyverse","stargazer","fixest","haven","lmtest","car","multcomp"))
 # FWER Table 2 - performance, split by family and RES05_gender
 # Loading required libraries
 library(tidyverse)
@@ -417,5 +417,46 @@ print_selected_results(models_list, outregvar2, pvals_C_by_var_selected,
 
 
 
-## .TEX OUTPUT ##
+## OUTPUT ##
+
+
+sink("~/work/FWER_Table2_sep_outcomes.txt", append = FALSE, split = TRUE)
+
+# runs
+cat("======================================================================\n")
+cat("FWER - Table 2: Performance (Runs)\n")
+cat("======================================================================\n\n")
+
+print_selected_results(models_list, outregvar2, pvals_A_by_var_selected,
+                       "SELECTED MODELS: GP without Gender Quota in 2005 (Runs only)",
+                       control_means, indices, incum_dep_vars_runs, selected_models_A)
+
+print_selected_results(models_list, outregvar2, pvals_B_by_var_selected,
+                       "SELECTED MODELS: GP with Gender Quota in 2005 (Runs only)",
+                       control_means, indices, incum_dep_vars_runs, selected_models_B)
+
+print_selected_results(models_list, outregvar2, pvals_C_by_var_selected,
+                       "SELECTED MODELS: All cases (Runs only)",
+                       control_means, indices, incum_dep_vars_runs, selected_models_C)
+
+# voteshare
+cat("\n\n======================================================================\n")
+cat("FWER - Table 2: Performance (Voteshare)\n")
+cat("======================================================================\n\n")
+
+print_selected_results(models_list, outregvar2, pvals_A_by_var_selected,
+                       "SELECTED MODELS: GP without Gender Quota in 2005 (Voteshare only)",
+                       control_means, indices, incum_dep_vars_voteshare, selected_models_A)
+
+print_selected_results(models_list, outregvar2, pvals_B_by_var_selected,
+                       "SELECTED MODELS: GP with Gender Quota in 2005 (Voteshare only)",
+                       control_means, indices, incum_dep_vars_voteshare, selected_models_B)
+
+print_selected_results(models_list, outregvar2, pvals_C_by_var_selected,
+                       "SELECTED MODELS: All cases (Voteshare only)",
+                       control_means, indices, incum_dep_vars_voteshare, selected_models_C)
+
+
+sink()
+
 

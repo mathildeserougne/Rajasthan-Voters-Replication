@@ -33,7 +33,7 @@ data_filtered <- data %>%
     X_anytr_genderres05 = INT_treatment * RES05_gender
   )
 
-# Dependent variables (excluding ELEC15_voteshare_incum10)
+# Dependent variables 
 dep_vars <- c("ELEC15_nbcands", "ELEC15_incum10_running",
               "ELEC15_prop_cand2010", "ELEC15_prop_female", "ELEC15_prop_nongen")
 
@@ -134,7 +134,7 @@ selected_models_A <- 1:length(dep_vars)  # Full Sample
 selected_models_B <- (length(dep_vars) + 1):(2 * length(dep_vars))  # Without Previous Gender Reservation
 selected_models_C <- ((2 * length(dep_vars) + 1)):(3 * length(dep_vars))  # With Previous Gender Reservation
 
-# Variables d'intérêt
+# Variables
 outregvar2 <- c("INT_treatment", "RES05_gender", "X_anytr_genderres05")
 outregvar2_B <- c("INT_treatment")
 outregvar2_C <- c("INT_treatment")
@@ -231,6 +231,20 @@ print_selected_results(models_list, outregvar2_C, pvals_C_by_var_selected,
                        "Panel C: With Previous Gender Reservation (RES05_gender == 1)",
                        control_means, selected_models_C, dep_vars)
 
+
+
+# saving the results from the first family
+sink("~/work/fwer_table4_part1_results.txt")
+print_selected_results(models_list, outregvar2, pvals_A_by_var_selected,
+                       "Panel A: Full Sample",
+                       control_means, selected_models_A, dep_vars)
+print_selected_results(models_list, outregvar2_B, pvals_B_by_var_selected,
+                       "Panel B: Without Previous Gender Reservation (RES05_gender == 0)",
+                       control_means, selected_models_B, dep_vars)
+print_selected_results(models_list, outregvar2_C, pvals_C_by_var_selected,
+                       "Panel C: With Previous Gender Reservation (RES05_gender == 1)",
+                       control_means, selected_models_C, dep_vars)
+sink()
 
 
 
@@ -371,7 +385,7 @@ selected_models_A <- 1:length(dep_vars)  # Full Sample
 selected_models_B <- (length(dep_vars) + 1):(2 * length(dep_vars))  # Without Previous Gender Reservation
 selected_models_C <- ((2 * length(dep_vars) + 1)):(3 * length(dep_vars))  # With Previous Gender Reservation
 
-# Variables d'intérêt
+# Variables
 outregvar2 <- c("INT_treatment", "RES05_gender", "X_anytr_genderres05")
 outregvar2_B <- c("INT_treatment")
 outregvar2_C <- c("INT_treatment")
@@ -467,3 +481,36 @@ print_selected_results(models_list, outregvar2_B, pvals_B_by_var_selected,
 print_selected_results(models_list, outregvar2_C, pvals_C_by_var_selected,
                        "Panel C: With Previous Gender Reservation (RES05_gender == 1)",
                        control_means, selected_models_C, dep_vars)
+
+
+# saving results from the family 2
+
+sink("~/work/fwer_table4_part2_results.txt")
+print_selected_results(models_list, outregvar2, pvals_A_by_var_selected,
+                       "Panel A: Full Sample",
+                       control_means, selected_models_A, dep_vars)
+print_selected_results(models_list, outregvar2_B, pvals_B_by_var_selected,
+                       "Panel B: Without Previous Gender Reservation (RES05_gender == 0)",
+                       control_means, selected_models_B, dep_vars)
+print_selected_results(models_list, outregvar2_C, pvals_C_by_var_selected,
+                       "Panel C: With Previous Gender Reservation (RES05_gender == 1)",
+                       control_means, selected_models_C, dep_vars)
+sink()
+
+
+
+## OUTPUT ##
+
+# merge the two previously saved series of results
+final_file <- "~/work/FWER_Table4_sep_outcomes.txt"
+
+
+writeLines(readLines("~/work/fwer_table4_part1_results.txt"), final_file)
+
+con <- file(final_file, open = "a")
+writeLines(readLines("~/work/fwer_table4_part2_results.txt"), con)
+close(con)
+
+# delete temporary files
+file.remove("~/work/fwer_table4_part1_results.txt", "~/work/fwer_table4_part2_results.txt")
+
