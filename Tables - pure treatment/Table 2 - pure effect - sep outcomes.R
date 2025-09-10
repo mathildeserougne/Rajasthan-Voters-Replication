@@ -345,3 +345,222 @@ print_results_three_columns(
 )
 
 
+
+## OUTPUT IN .TEX ##
+
+
+
+print_results_to_tex <- function(models_runs, control_means_runs,
+                                 models_voteshare, control_means_voteshare,
+                                 filename) {
+  # open file
+  sink(paste0(filename, ".tex"), append = FALSE, split = TRUE)
+  
+  # heading
+  cat("\\documentclass{article}
+\\usepackage{booktabs}
+\\usepackage{caption}
+\\usepackage{adjustbox}
+\\usepackage{pdflscape}
+\\begin{document}
+\\begin{landscape}
+\\begin{table}[htbp]
+\\centering
+\\caption{Résultats des régressions pour les variables dépendantes (Running et Voteshare)}
+\\label{tab:regression_results}", sep = "\n")
+  
+  # Panel A: GP without Gender Quota in 2005 (Running)
+  cat("\\begin{tabular}{lccc}
+\\toprule
+& \\multicolumn{3}{c}{GP without Gender Quota in 2005 (Running)} \\\\
+\\cmidrule(lr){2-4}
+Variable & INC05 running & INCSPOUSE05 running & INCOTHER05 running \\\\
+& (index empl svy 0) & (index empl svy 1) & (index empl svy 2) \\\\
+\\midrule", sep = "\n")
+  
+  for (var in c("INT treatment", "TEMP index", "TEMP X anytr index")) {
+    var_real <- gsub(" ", "_", var)
+    cat(gsub("_", " ", var_real))
+    for (i in c(1, 5, 9)) {
+      model <- models_runs[[i]]
+      if (!is.null(model) && var_real %in% rownames(coef(summary(model)))) {
+        coef_val <- round(coef(summary(model))[var_real, "Estimate"], 4)
+        se_val <- round(coef(summary(model))[var_real, "Std. Error"], 4)
+        cat(" & $", coef_val, " (", se_val, ")", "$", sep = "")
+      } else {
+        cat(" & ", sep = "")
+      }
+    }
+    cat(" \\\\", sep = "")
+  }
+  
+  cat("\\\\
+\\midrule
+Mean (Control) ")
+  for (i in c(1, 5, 9)) {
+    cat(" & ", control_means_runs[i], sep = "")
+  }
+  cat(" \\\\", sep = "")
+  
+  cat("Observations ")
+  for (i in c(1, 5, 9)) {
+    model <- models_runs[[i]]
+    if (!is.null(model)) cat(" & ", nobs(model), sep = "")
+  }
+  cat(" \\\\", sep = "")
+  
+  cat("\\bottomrule
+\\end{tabular}", sep = "\n")
+  
+  # Panel B: GP with Gender Quota in 2005 (Running)
+  cat("\\quad
+\\begin{tabular}{lccc}
+\\toprule
+& \\multicolumn{3}{c}{GP with Gender Quota in 2005 (Running)} \\\\
+\\cmidrule(lr){2-4}
+Variable & INC05 running & INCSPOUSE05 running & INCOTHER05 running \\\\
+& (index empl svy 0) & (index empl svy 1) & (index empl svy 2) \\\\
+\\midrule", sep = "\n")
+  
+  for (var in c("INT treatment", "TEMP index", "TEMP X anytr index")) {
+    var_real <- gsub(" ", "_", var)
+    cat(gsub("_", " ", var_real))
+    for (i in c(13, 17, 21)) {
+      model <- models_runs[[i]]
+      if (!is.null(model) && var_real %in% rownames(coef(summary(model)))) {
+        coef_val <- round(coef(summary(model))[var_real, "Estimate"], 4)
+        se_val <- round(coef(summary(model))[var_real, "Std. Error"], 4)
+        cat(" & $", coef_val, " (", se_val, ")", "$", sep = "")
+      } else {
+        cat(" & ", sep = "")
+      }
+    }
+    cat(" \\\\", sep = "")
+  }
+  
+  cat("\\\\
+\\midrule
+Mean (Control) ")
+  for (i in c(13, 17, 21)) {
+    cat(" & ", control_means_runs[i], sep = "")
+  }
+  cat(" \\\\", sep = "")
+  
+  cat("Observations ")
+  for (i in c(13, 17, 21)) {
+    model <- models_runs[[i]]
+    if (!is.null(model)) cat(" & ", nobs(model), sep = "")
+  }
+  cat(" \\\\", sep = "")
+  
+  cat("\\bottomrule
+\\end{tabular}", sep = "\n")
+  
+  # clearpage to be able to read
+  cat("\\end{table}
+\\clearpage
+\\begin{table}[htbp]
+\\centering", sep = "\n")
+  
+  # Panel C: GP without Gender Quota in 2005 (Voteshare)
+  cat("\\quad
+\\begin{tabular}{lccc}
+\\toprule
+& \\multicolumn{3}{c}{GP without Gender Quota in 2005 (Voteshare)} \\\\
+\\cmidrule(lr){2-4}
+Variable & INC05 voteshare & INCSPOUSE05 voteshare & INCOTHER05 voteshare \\\\
+& (index empl svy 0) & (index empl svy 1) & (index empl svy 2) \\\\
+\\midrule", sep = "\n")
+  
+  for (var in c("INT treatment", "TEMP index", "TEMP X anytr index")) {
+    var_real <- gsub(" ", "_", var)
+    cat(gsub("_", " ", var_real))
+    for (i in c(1, 5, 9)) {
+      model <- models_voteshare[[i]]
+      if (!is.null(model) && var_real %in% rownames(coef(summary(model)))) {
+        coef_val <- round(coef(summary(model))[var_real, "Estimate"], 4)
+        se_val <- round(coef(summary(model))[var_real, "Std. Error"], 4)
+        cat(" & $", coef_val, " (", se_val, ")", "$", sep = "")
+      } else {
+        cat(" & ", sep = "")
+      }
+    }
+    cat(" \\\\", sep = "")
+  }
+  
+  cat("\\\\
+\\midrule
+Mean (Control) ")
+  for (i in c(1, 5, 9)) {
+    cat(" & ", control_means_voteshare[i], sep = "")
+  }
+  cat(" \\\\", sep = "")
+  
+  cat("Observations ")
+  for (i in c(1, 5, 9)) {
+    model <- models_voteshare[[i]]
+    if (!is.null(model)) cat(" & ", nobs(model), sep = "")
+  }
+  cat(" \\\\", sep = "")
+  
+  cat("\\bottomrule
+\\end{tabular}", sep = "\n")
+  
+  # Panel D: GP with Gender Quota in 2005 (Voteshare)
+  cat("\\quad
+\\begin{tabular}{lccc}
+\\toprule
+& \\multicolumn{3}{c}{GP with Gender Quota in 2005 (Voteshare)} \\\\
+\\cmidrule(lr){2-4}
+Variable & INC05 voteshare & INCSPOUSE05 voteshare & INCOTHER05 voteshare \\\\
+& (index empl svy 0) & (index empl svy 1) & (index empl svy 2) \\\\
+\\midrule", sep = "\n")
+  
+  for (var in c("INT treatment", "TEMP index", "TEMP X anytr index")) {
+    var_real <- gsub(" ", "_", var)
+    cat(gsub("_", " ", var_real))
+    for (i in c(13, 17, 21)) {
+      model <- models_voteshare[[i]]
+      if (!is.null(model) && var_real %in% rownames(coef(summary(model)))) {
+        coef_val <- round(coef(summary(model))[var_real, "Estimate"], 4)
+        se_val <- round(coef(summary(model))[var_real, "Std. Error"], 4)
+        cat(" & $", coef_val, " (", se_val, ")", "$", sep = "")
+      } else {
+        cat(" & ", sep = "")
+      }
+    }
+    cat(" \\\\", sep = "")
+  }
+  
+  cat("\\\\
+\\midrule
+Mean (Control) ")
+  for (i in c(13, 17, 21)) {
+    cat(" & ", control_means_voteshare[i], sep = "")
+  }
+  cat(" \\\\", sep = "")
+  
+  cat("Observations ")
+  for (i in c(13, 17, 21)) {
+    model <- models_voteshare[[i]]
+    if (!is.null(model)) cat(" & ", nobs(model), sep = "")
+  }
+  cat(" \\\\", sep = "")
+  
+  cat("\\bottomrule
+\\end{tabular}
+\\end{table}
+\\end{landscape}
+\\end{document}", sep = "\n")
+  
+  # close file
+  sink()
+}
+
+
+
+print_results_to_tex(
+  results_runs$models, results_runs$control_means,
+  results_voteshare$models, results_voteshare$control_means,
+  "~/work/Table2_four_panels_tex"
+)

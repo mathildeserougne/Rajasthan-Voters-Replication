@@ -134,14 +134,14 @@ sink()
 ## TEX OUTPUT
 
 
-# Noms des colonnes pour stargazer avec des espaces
+# col names with spaces
 col_names_runs <- c("Incumbent Runs", "Incumbent Spouse Runs", "Other Family Member Runs")
 col_names_voteshare <- c("Incumbent Vote Share", "Incumbent Spouse Vote Share", "Other Family Member Vote Share")
 
 # TEX OUTPUT
 sink("~/work/Table1_sep_outcomes_Combined.tex")
 
-# Début du document LaTeX
+# start
 cat("\\documentclass{article}
 \\usepackage{booktabs}
 \\begin{document}
@@ -179,9 +179,9 @@ stargazer(panel_C_voteshare, type = "latex", keep = "INT_treatment", digits = 2,
           dep.var.labels = col_names_voteshare, model.numbers = FALSE, omit = "Intercept",
           title = "Panel C: RES05 gender = 1")
 
-# Fin du document LaTeX
+# end
 cat("\\end{center}
 \\end{document}")
 
-# Fermer la sortie tex
+
 sink()
