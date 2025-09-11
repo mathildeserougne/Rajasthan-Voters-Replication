@@ -12,7 +12,7 @@
 # columns: incumbent voteshare, spouse voteshare, other voteshare.
 
 
-install.packages(c("haven","dplyr"))
+#install.packages(c("haven","dplyr"))
 library(haven)
 
 # LIBRARIES 
